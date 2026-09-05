@@ -128,6 +128,34 @@ td.n,th.n{text-align:right; font-family:"IBM Plex Mono",monospace; font-variant-
   text-align:right; color:var(--ink-2)}
 .dnum b{color:var(--ink); font-size:14px}
 
+/* per-player simulation grid */
+.pgrid{width:100%; border-collapse:collapse; font-size:13px}
+.pgrid th{padding:8px 8px}
+.pgrid td{padding:5px 8px; border-bottom:1px solid var(--line); white-space:nowrap}
+.pgrid tbody tr:last-child td{border-bottom:none}
+.pcell{position:relative; height:19px; width:62px; background:var(--panel-2); border-radius:2px;
+  overflow:hidden}
+.pcell .rng{position:absolute; top:0; bottom:0; background:color-mix(in oklab,var(--teal) 22%,var(--panel-2))}
+.pcell .med{position:absolute; top:0; bottom:0; width:2px; background:var(--teal)}
+.pcell b{position:absolute; inset:0; display:flex; align-items:center; justify-content:center;
+  font-family:"IBM Plex Mono",monospace; font-size:11px; font-weight:600; color:var(--ink)}
+.pcell.zero{background:repeating-linear-gradient(45deg,var(--panel-2),var(--panel-2) 4px,var(--panel) 4px,var(--panel) 8px)}
+.pcell.zero b{color:var(--ink-3)}
+.vpm{font-family:"IBM Plex Mono",monospace; font-size:12px; font-variant-numeric:tabular-nums}
+
+/* value scatter small multiples */
+.facets{display:grid; grid-template-columns:repeat(auto-fit,minmax(232px,1fr)); gap:12px}
+.facet{background:var(--panel); border:1px solid var(--line); border-radius:3px; padding:12px 12px 8px}
+.facet h3{font-size:12px; letter-spacing:.06em; text-transform:uppercase; color:var(--ink-2);
+  margin-bottom:6px}
+.facet svg{display:block; width:100%; height:auto; overflow:visible}
+.facet .ax{stroke:var(--line-2); stroke-width:1}
+.facet .gl{stroke:var(--line); stroke-width:1}
+.facet text{fill:var(--ink-3); font-family:"IBM Plex Mono",monospace; font-size:8.5px}
+.facet text.lbl{fill:var(--ink); font-family:"Source Sans 3",sans-serif; font-size:9.5px; font-weight:600}
+.facet .pool{fill:var(--ink-3); opacity:.30}
+.facet .mine{fill:var(--teal); stroke:var(--panel); stroke-width:1.5}
+
 /* provenance banner */
 .prov{display:flex; gap:12px; align-items:flex-start; padding:13px 16px; border-radius:3px;
   border:1px solid var(--line); background:var(--panel); font-size:13px; color:var(--ink-2)}
@@ -262,6 +290,64 @@ def dist_row(label, d, lo, hi, extra=""):
            d["median"], esc(extra)))
 
 
+def pcell(d, vmax):
+    """One player-gameweek: p10-p90 band, median tick, value in the middle."""
+    if not d or d.get("p90", 0) <= 0:
+        return '<div class="pcell zero"><b>0</b></div>'
+    w = lambda v: max(0.0, min(100.0, v / vmax * 100.0))
+    return ('<div class="pcell"><span class="rng" style="left:%.1f%%;width:%.1f%%"></span>'
+            '<span class="med" style="left:%.1f%%"></span><b>%.0f</b></div>'
+            % (w(d["p10"]), max(w(d["p90"]) - w(d["p10"]), 1.5), w(d["median"]), d["median"]))
+
+
+def scatter(title, rows, mine_ids):
+    """Price against projected points for one position. Emphasis, not category."""
+    W, H, PL, PB, PT, PR = 232, 150, 26, 20, 8, 8
+    xs = [r["price"] for r in rows] or [4.0]
+    ys = [r["total"] for r in rows] or [0.0]
+    x0, x1 = min(xs), max(max(xs), min(xs) + 0.5)
+    y0, y1 = 0.0, max(max(ys), 1.0)
+    def sx(v):
+        return PL + (v - x0) / (x1 - x0) * (W - PL - PR)
+    def sy(v):
+        return H - PB - (v - y0) / (y1 - y0) * (H - PB - PT)
+    p = ['<svg viewBox="0 0 %d %d" role="img" aria-label="%s: price against projected points">'
+         % (W, H, esc(title))]
+    for frac in (0.0, 0.5, 1.0):
+        yv = y0 + (y1 - y0) * frac
+        p.append('<line class="gl" x1="%.1f" y1="%.1f" x2="%.1f" y2="%.1f"/>'
+                 % (PL, sy(yv), W - PR, sy(yv)))
+        p.append('<text x="%.1f" y="%.1f" text-anchor="end">%.0f</text>' % (PL - 4, sy(yv) + 3, yv))
+    p.append('<line class="ax" x1="%.1f" y1="%.1f" x2="%.1f" y2="%.1f"/>' % (PL, H - PB, W - PR, H - PB))
+    for xv in (x0, (x0 + x1) / 2, x1):
+        p.append('<text x="%.1f" y="%.1f" text-anchor="middle">%.1f</text>' % (sx(xv), H - PB + 11, xv))
+    p.append('<text x="%.1f" y="%.1f" text-anchor="middle">price &#163;m</text>'
+             % ((PL + W - PR) / 2, H - 3))
+    for r in rows:
+        if r["id"] in mine_ids:
+            continue
+        p.append('<circle class="pool" cx="%.1f" cy="%.1f" r="2.6"/>' % (sx(r["price"]), sy(r["total"])))
+    # place labels last, nudging any that would collide with one already placed
+    placed = []
+    mine = sorted([r for r in rows if r["id"] in mine_ids], key=lambda r: -r["total"])
+    for r in mine:
+        cx, cy = sx(r["price"]), sy(r["total"])
+        p.append('<circle class="mine" cx="%.1f" cy="%.1f" r="4"/>' % (cx, cy))
+        anchor = "end" if cx > W * 0.62 else "start"
+        dx = -7 if anchor == "end" else 7
+        ly = cy + 3.2
+        for _ in range(6):
+            if not any(abs(ly - py) < 9.5 and abs(cx - px) < 62 for px, py in placed):
+                break
+            ly += 10.0
+        ly = min(ly, H - PB - 2)
+        placed.append((cx, ly))
+        p.append('<text class="lbl" x="%.1f" y="%.1f" text-anchor="%s">%s</text>'
+                 % (cx + dx, ly, anchor, esc(r["name"])))
+    p.append("</svg>")
+    return '<div class="facet"><h3>%s</h3>%s</div>' % (esc(title), "".join(p))
+
+
 def duty(p):
     """Set-piece duty badges: penalties first, then corners / free kicks."""
     out = []
@@ -340,29 +426,23 @@ def render(ctx, path):
           '<button id="liveSwap" type="button">Apply</button>'
           '<button id="liveReset" type="button">Reset</button>'
           '<button id="liveRun" type="button">Re-run</button></div>')
-        A('<div class="kpis">'
-          '<div class="kpi" id="liveHead"><span class="v">&mdash;</span><span class="s">simulating&hellip;</span></div>'
-          '<div class="kpi" id="liveRange"><span class="v">&mdash;</span><span class="s">&nbsp;</span></div>'
-          '<div class="kpi" id="liveCap"><span class="v">&mdash;</span><span class="s">&nbsp;</span></div>'
-          '<div class="kpi" id="liveSubs"><span class="v">&mdash;</span><span class="s">&nbsp;</span></div>'
-          "</div>")
+        lk = ctx.get("live_kpis") or []
+        A('<div class="kpis">')
+        for tid, val, sub in lk:
+            A('<div class="kpi" id="%s"><span class="v">%s</span><span class="s">%s</span></div>'
+              % (tid, val, sub))
+        A("</div>")
         A('<div class="dist"><div class="drow head"><span>Week</span>'
           '<span>10th &rarr; 90th percentile &middot; box is the middle half</span>'
-          '<span style="text-align:right">Median</span><span>Captain</span></div>'
-          '<div id="liveRows"></div></div>')
-        A("</section>")
-
-    # ---- simulation
-    sim = ctx.get("sim")
-    if sim:
-        A('<section><div class="shead"><h2>%s</h2><p>%s</p></div>' % (esc(sim["title"]), sim["sub"]))
-        A('<div class="dist"><div class="drow head"><span>Week</span>'
-          '<span>10th percentile &rarr; 90th percentile &middot; box is the middle half</span>'
-          '<span style="text-align:right">Median</span></div>')
-        for r in sim["rows"]:
-            A(dist_row(r["label"], r["d"], sim["lo"], sim["hi"], r["extra"]))
-        A("</div>")
-        A('<p class="note">%s</p>' % sim["note"])
+          '<span style="text-align:right">Median</span><span>Captain</span></div>')
+        A('<div id="liveRows">')
+        sim = ctx.get("sim")
+        if sim:
+            for r in sim["rows"]:
+                A(dist_row(r["label"], r["d"], sim["lo"], sim["hi"], r["extra"]))
+        A("</div></div>")
+        if sim:
+            A('<p class="note">%s</p>' % sim["note"])
         A("</section>")
 
     # ---- week plan
@@ -377,6 +457,42 @@ def render(ctx, path):
             A("<li><span>%s</span><b>%s</b></li>" % (esc(lab), esc(val)))
         A("</ul></div>")
     A("</div></section>")
+
+    # ---- per-player simulation
+    ps = ctx.get("player_sim")
+    if ps:
+        A('<section><div class="shead"><h2>Every player, every gameweek</h2>'
+          '<p>Simulated points per player per week. The bar spans the 10th to 90th '
+          'percentile, the tick is the median, and captaincy is already counted.</p></div>')
+        A('<div class="tw"><table class="pgrid"><thead><tr><th>Player</th><th>Pos</th>'
+          '<th class="n">&pound;</th>')
+        for g in gws:
+            A('<th class="gw" style="text-align:center">GW%d</th>' % g)
+        A('<th class="n">5&#8209;GW</th><th class="n">Per &pound;m</th><th>Role</th></tr></thead><tbody>')
+        for r in ps["rows"]:
+            A('<tr><td><span class="pname">%s</span><span class="tm">%s</span>%s</td>'
+              '<td><span class="pos">%s</span></td><td class="n">%.1f</td>'
+              % (esc(r["name"]), esc(r["team"]), r["duty"], esc(r["pos"]), r["price"]))
+            for g in gws:
+                A('<td>%s</td>' % pcell(r["gw"].get(g), ps["cell_max"]))
+            A('<td class="n">%.0f</td><td class="vpm">%.1f</td><td>%s</td></tr>'
+              % (r["total"]["median"], r["per_m"], r["role"]))
+        A("</tbody></table></div>")
+        A('<p class="note">%s</p>' % ps["note"])
+        A("</section>")
+
+    # ---- value by position
+    vf = ctx.get("value_facets")
+    if vf:
+        A('<section><div class="shead"><h2>Value by position</h2>'
+          '<p>Projected points against price, one panel per position. '
+          'Your players are marked; the faint dots are everyone else worth owning.</p></div>')
+        A('<div class="facets">')
+        for f in vf["panels"]:
+            A(scatter(f["title"], f["rows"], vf["mine"]))
+        A("</div>")
+        A('<p class="note">%s</p>' % vf["note"])
+        A("</section>")
 
     # ---- squad
     A('<section><div class="shead"><h2>Your squad, week by week</h2>'

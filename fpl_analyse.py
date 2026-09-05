@@ -246,3 +246,27 @@ def build_squad(pool, gws, budget, must_keep=(), seed=None):
         if not improved:
             break
     return squad, best_val
+
+
+def multi_transfer(squad, pool, gws, bank, k, shortlist=6):
+    """
+    Best k transfers, found greedily: take the strongest single move, re-solve,
+    repeat. Not guaranteed optimal, but it respects budget and the club cap at
+    every step, which a naive top-k list does not.
+    """
+    base = horizon_value(squad, gws)
+    cur, cur_bank, moves = list(squad), bank, []
+    for _ in range(k):
+        singles, _ = single_transfers(cur, pool, gws, cur_bank, limit=shortlist)
+        if not singles:
+            break
+        best = singles[0]
+        if best["gain"] <= 0.01:
+            break
+        cur = [best["in"] if p["id"] == best["out"]["id"] else p for p in cur]
+        cur_bank = round(cur_bank + best["out"]["price"] - best["in"]["price"], 1)
+        moves.append(best)
+    return {
+        "moves": moves, "squad": cur, "bank_after": cur_bank,
+        "gain": horizon_value(cur, gws) - base, "base": base,
+    }

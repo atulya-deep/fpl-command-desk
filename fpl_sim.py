@@ -53,6 +53,10 @@ def simulate(squad, gws, boot, n=4000, seed=7, captain_of=None, xi_of=None):
     GOAL, CS, CONC, DCP = SC["goals"], SC["clean_sheet"], SC["conceded"], SC["dc"]
 
     per_gw = dict((g, []) for g in gws)
+    # per-player, per-gameweek samples so the dashboard can show where the
+    # points actually come from rather than only the squad total
+    pp = dict((p["id"], dict((g, []) for g in gws)) for p in squad)
+    pp_tot = dict((p["id"], []) for p in squad)
     totals = []
     cap_returns = dict((g, 0) for g in gws)
     autosubs = 0
@@ -120,9 +124,18 @@ def simulate(squad, gws, boot, n=4000, seed=7, captain_of=None, xi_of=None):
                 if pts[cap_id] >= 6:
                     cap_returns[gw] += 1
 
+            act = set(p["id"] for p in active)
+            for p in squad:
+                v = pts[p["id"]] if p["id"] in act else 0.0
+                if p["id"] == cap_id and p["id"] in act:
+                    v *= 2
+                pp[p["id"]][gw].append(v)
+
             per_gw[gw].append(gw_pts)
             run_total += gw_pts
         totals.append(run_total)
+    for pid in pp:
+        pp_tot[pid] = [sum(pp[pid][g][i] for g in gws) for i in range(n)]
 
     return {
         "n": n,
@@ -131,6 +144,10 @@ def simulate(squad, gws, boot, n=4000, seed=7, captain_of=None, xi_of=None):
         "captain_return_rate": dict((g, cap_returns[g] / n) for g in gws),
         "autosubs_per_run": autosubs / n,
         "samples": totals,
+        "players": dict(
+            (pid, {"gw": dict((g, _describe(pp[pid][g])) for g in gws),
+                   "total": _describe(pp_tot[pid])})
+            for pid in pp),
     }
 
 

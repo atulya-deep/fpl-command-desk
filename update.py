@@ -169,15 +169,21 @@ def main():
     broken = [p for p in squad if p["total"] < 16.0]
 
     # ---- decide the headline recommendation
+    #
+    # Free transfers accumulate to five, so the real question is never
+    # "wildcard or nothing" - it is whether the wildcard beats what the banked
+    # free transfers already buy. A chip is only worth burning for a wide
+    # margin, because it stays useful right up to GW19.
+    ftplan = A.multi_transfer(squad, pool, gws, bank, max(ft, 1))
     wc_gain = wcval - base
-    if cfg.get("chips", {}).get("wildcard1_used"):
-        wc_gain = -1
-    if wc_gain > 35 and len(broken) >= 5:
+    wc_used = bool(cfg.get("chips", {}).get("wildcard1_used"))
+    wc_edge = wc_gain - ftplan["gain"]
+    if not wc_used and wc_edge > 35 and len(broken) >= 5:
         mode = "wildcard"
-    elif dbl and dbl["gain"] - (0 if ft >= 2 else A.HIT) > max((s["gain"] for s in singles), default=0):
-        mode = "double"
+    elif ftplan["moves"] and ftplan["gain"] > 3:
+        mode = "transfers"
     else:
-        mode = "single"
+        mode = "hold"
 
     # ---- verdict copy
     top = singles[0] if singles else None
@@ -268,7 +274,7 @@ def main():
                         "the instruction, and swap individuals you have a strong read on.",
         }
     else:
-        src = dbl["moves"] if mode == "double" else singles[:3]
+        src = ftplan["moves"] if mode == "transfers" else singles[:3]
         moves = []
         for m in src:
             moves.append({
@@ -279,7 +285,7 @@ def main():
                 "gain": "%+.0f" % m["gain"],
             })
         plan = {
-            "title": "Recommended transfers" if mode == "double" else "Best single moves, ranked",
+            "title": "Recommended transfers" if mode == "transfers" else "Best single moves, ranked",
             "sub": "Gain is expected points across GW%d&ndash;%d, after re-picking the XI each week."
                    % (gws[0], gws[-1]),
             "moves": moves,
@@ -315,9 +321,7 @@ def main():
     # ---- Monte Carlo: the squad as it stands vs the recommended squad
     print("Simulating %d seasons ..." % SIM_RUNS)
     plan_squad = wc if mode == "wildcard" else (
-        dbl["squad"] if mode == "double" and dbl else
-        [singles[0]["in"] if p["id"] == singles[0]["out"]["id"] else p for p in squad]
-        if singles else squad)
+        ftplan["squad"] if mode == "transfers" else squad)
     sim_now = SIM.simulate(squad, gws, boot, n=SIM_RUNS)
     sim_plan = SIM.simulate(plan_squad, gws, boot, n=SIM_RUNS, seed=7)
     p_better = SIM.beat_probability(sim_plan["samples"], sim_now["samples"])
@@ -347,6 +351,78 @@ def main():
                sim_now["autosubs_per_run"])),
     }
 
+    # ---- per-player simulation table
+    prole = {}
+    for r in rep:
+        for p_ in r["xi"]:
+            prole[p_["id"]] = prole.get(p_["id"], 0) + 1
+    cap_counts = {}
+    for r in rep:
+        cap_counts[r["captain"]["id"]] = cap_counts.get(r["captain"]["id"], 0) + 1
+
+    prows = []
+    for p_ in squad:
+        d = sim_now["players"][p_["id"]]
+        starts = prole.get(p_["id"], 0)
+        if cap_counts.get(p_["id"]):
+            role = '<span class="pill ok">Captain &times;%d</span>' % cap_counts[p_["id"]]
+        elif p_["avail"] <= 0.05:
+            role = '<span class="pill out">Out</span>'
+        elif starts >= 4:
+            role = '<span class="pill ok">Starter</span>'
+        elif starts == 0:
+            role = '<span class="pill warn">Bench</span>'
+        else:
+            role = '<span class="pill warn">Rotates in %d/%d</span>' % (starts, len(gws))
+        prows.append({
+            "name": p_["name"], "team": p_["team_short"], "pos": p_["pos"],
+            "price": p_["price"], "duty": D.duty(p_),
+            "gw": dict((g, d["gw"][g]) for g in gws), "total": d["total"],
+            "per_m": d["total"]["median"] / p_["price"] if p_["price"] else 0.0,
+            "role": role, "et": p_["et"],
+        })
+    prows.sort(key=lambda r: (r["et"], -r["total"]["median"]))
+    cell_max = max((r["gw"][g]["p90"] for r in prows for g in gws), default=1) or 1
+    best_v = max(prows, key=lambda r: r["per_m"])
+    worst_v = min([r for r in prows if r["total"]["median"] > 0] or prows, key=lambda r: r["per_m"])
+    player_sim = {
+        "rows": prows, "cell_max": cell_max,
+        "note": (
+            "A hatched cell means the player is on your bench that week and only scores if an "
+            "auto-substitution brings him on. <b>%s</b> returns the most per million (%.1f points "
+            "per &pound;m across the window); <b>%s</b> the least (%.1f). Price is the constraint "
+            "that makes this a squad problem rather than a shopping list &mdash; every pound tied "
+            "up in a low-yield slot is a pound not spent on a premium."
+            % (best_v["name"], best_v["per_m"], worst_v["name"], worst_v["per_m"])),
+    }
+
+    # ---- value against price, faceted by position
+    mine = set(p_["id"] for p_ in squad)
+    panels = []
+    for et, label in ((1, "Goalkeepers"), (2, "Defenders"), (3, "Midfielders"), (4, "Forwards")):
+        cand = [p_ for p_ in pool
+                if p_["et"] == et and p_["n_fix"] > 0 and (p_["avail"] > 0.5 or p_["id"] in mine)
+                and (p_["mins"] > 45 or p_["id"] in mine)]
+        cand.sort(key=lambda x: -x["total"])
+        keep = cand[:48] + [p_ for p_ in squad if p_["et"] == et]
+        seen, rows_ = set(), []
+        for p_ in keep:
+            if p_["id"] in seen:
+                continue
+            seen.add(p_["id"])
+            rows_.append({"id": p_["id"], "name": p_["name"], "price": p_["price"],
+                          "total": p_["total"]})
+        panels.append({"title": label, "rows": rows_})
+    value_facets = {
+        "panels": panels, "mine": mine,
+        "note": (
+            "Up and to the left is what you want: points without spending for them. A player sitting "
+            "low and to the right is the argument for a transfer &mdash; you are paying premium money "
+            "for a mid-table return, and that budget moves. Position matters because the scales "
+            "differ: a &pound;5.0m defender returning 25 is doing a different job from a &pound;15.5m "
+            "forward returning 29."),
+    }
+
     dl = next((e["deadline_time"] for e in boot["events"] if e["id"] == gws[0]), "")
     dl_txt = dl.replace("T", " ")[:16] + " UTC" if dl else "-"
 
@@ -362,6 +438,18 @@ def main():
         ],
         "gws": gws,
         "sim": sim_ctx,
+        "player_sim": player_sim,
+        "live_kpis": [
+            ("liveHead", "%.0f" % sim_now["total"]["median"],
+             "median over GW%d&ndash;%d" % (gws[0], gws[-1])),
+            ("liveRange", "%.0f&ndash;%.0f" % (sim_now["total"]["p10"], sim_now["total"]["p90"]),
+             "80%% of {:,} runs".format(SIM_RUNS)),
+            ("liveCap", "%.0f&ndash;%.0f%%" % (min(sim_now["captain_return_rate"].values()) * 100,
+                                               max(sim_now["captain_return_rate"].values()) * 100),
+             "captain returns 6+"),
+            ("liveSubs", "%.1f" % sim_now["autosubs_per_run"], "auto-subs per five weeks"),
+        ],
+        "value_facets": value_facets,
         "payload": export_payload(squad, pool, gws, cfg, SYNCED["ok"], bank, ft),
         "live_js": open(os.path.join(HERE, "live_sim.js"), encoding="utf-8").read(),
         "provenance": {

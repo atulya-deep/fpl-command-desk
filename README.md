@@ -101,20 +101,23 @@ ids are already public on the game's own leaderboards, so this leaks nothing new
 you would rather it stay private, keep using the Claude artifact instead, or put
 the repo on a paid plan where Pages can serve from a private repo.
 
-## Connect your live squad
+## Your live squad
 
-Put your FPL team id in `config.json` and the squad, bank and team value sync
-themselves on every run — no more hand-editing.
+`config.json` carries team id **7561127**, so squad, bank, team value and
+transfers sync from FPL on every run. The banner at the top of the dashboard
+turns teal to confirm it, and goes amber if a run ever falls back to the saved
+squad.
 
-```json
-{ "team_id": 1234567 }
-```
+Keep `chips` current by hand — the API reports chips already played, but not
+which you intend to save. Setting `"wildcard1_used": true` stops the model
+recommending a chip you have spent.
 
-Your id is the number in the URL when you view your own team on the FPL site:
-`fantasy.premierleague.com/entry/<THIS NUMBER>/event/3`.
+### Free transfers matter more than they look
 
-Also keep `chips` current — setting `"wildcard1_used": true` stops the model
-recommending a chip you have already spent.
+Free transfers bank up to five. The recommendation engine works out what those
+banked transfers already buy before it will suggest a chip, and only calls for
+the Wildcard when it beats the free moves by a wide margin — a chip stays useful
+until GW19, so burning one to save four points is a bad trade.
 
 ## Files
 

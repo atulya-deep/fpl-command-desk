@@ -1,9 +1,30 @@
 {
   "manager": "Gusta",
   "dashboard_title": "FPL Command Desk",
-  "team_id": null,
+  "team_id": 7561127,
   "bank": 0.0,
-  "free_transfers": 1,
-  "chips": { "wildcard1_used": false, "freehit_used": false, "bboost_used": false, "triplecap_used": false },
-  "squad": [109, 496, 8, 87, 418, 329, 259, 426, 398, 368, 94, 557, 411, 165, 346]
+  "free_transfers": 4,
+  "chips": {
+    "wildcard1_used": false,
+    "freehit_used": false,
+    "bboost_used": true,
+    "triplecap_used": false
+  },
+  "squad": [
+    109,
+    8,
+    87,
+    418,
+    368,
+    557,
+    426,
+    398,
+    411,
+    346,
+    165,
+    496,
+    94,
+    329,
+    259
+  ]
 }
