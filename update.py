@@ -108,11 +108,12 @@ def export_payload(squad, pool, gws, cfg, synced, bank, ft):
         }
 
     sq_ids = [p["id"] for p in squad]
-    # squad plus a deep enough bench of alternatives to make swaps meaningful
-    extra = [p for p in sorted(pool, key=lambda x: -x["total"])
-             if p["id"] not in sq_ids and p["avail"] > 0.5 and p["n_fix"] > 0][:140]
+    # the whole eligible pool, so a visitor can build any legal squad in the
+    # browser rather than only swap within a shortlist
+    elig = [p for p in pool
+            if p["n_fix"] > 0 and p["status"] != "u" and p["id"] not in sq_ids]
     players = {}
-    for p in squad + extra:
+    for p in squad + elig:
         players[str(p["id"])] = pack(p)
     return {
         "gws": gws, "squad": sq_ids, "players": players, "scoring": SCORING_JS,
@@ -542,6 +543,7 @@ def main():
         "live_js": open(os.path.join(HERE, "live_sim.js"), encoding="utf-8").read(),
         "provenance": {
             "synced": SYNCED["ok"],
+            "team_id": cfg.get("team_id"),
             "text": (
                 ("Squad, bank and team value are <b>synced live</b> from FPL team "
                  "%s, so this page reflects the team you actually own." % cfg.get("team_id"))

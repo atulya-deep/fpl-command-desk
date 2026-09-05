@@ -131,6 +131,43 @@ td.n,th.n{text-align:right; font-family:"IBM Plex Mono",monospace; font-variant-
   text-align:right; color:var(--ink-2)}
 .dnum b{color:var(--ink); font-size:14px}
 
+/* start screen + builder */
+.start{max-width:760px; margin:24px auto; display:flex; flex-direction:column; gap:20px}
+.start h1{font-size:clamp(30px,5vw,44px)}
+.start .lede{font-size:16px; color:var(--ink-2); max-width:62ch}
+.choices{display:grid; grid-template-columns:repeat(auto-fit,minmax(240px,1fr)); gap:14px}
+.choice{text-align:left; background:var(--panel); border:1px solid var(--line); border-radius:3px;
+  padding:18px 19px; cursor:pointer; display:flex; flex-direction:column; gap:7px;
+  font-family:"Source Sans 3",system-ui,sans-serif}
+.choice:hover{border-color:var(--teal)}
+.choice:focus-visible{outline:2px solid var(--teal); outline-offset:2px}
+.choice b{font-family:Archivo,system-ui,sans-serif; font-size:17px; font-weight:800; color:var(--ink)}
+.choice span{font-size:13.5px; color:var(--ink-3); line-height:1.5}
+.choice.primary{border-left:5px solid var(--teal)}
+
+.bhead{display:flex; gap:12px; align-items:center; flex-wrap:wrap; justify-content:space-between}
+.bfilters{display:flex; gap:8px; align-items:center; flex-wrap:wrap; padding:11px 13px;
+  background:var(--panel-2); border:1px solid var(--line); border-radius:3px}
+.bfilters button[data-et]{font-family:Archivo,system-ui,sans-serif; font-size:11px; font-weight:700;
+  letter-spacing:.06em; padding:5px 11px; border:1px solid var(--line-2); background:var(--panel);
+  color:var(--ink-2); border-radius:2px; cursor:pointer}
+.bfilters button[data-et][aria-pressed="true"]{background:var(--ink); color:var(--bg); border-color:var(--ink)}
+input[type=search]{font-family:"Source Sans 3",system-ui,sans-serif; font-size:13px; padding:5px 9px;
+  border:1px solid var(--line-2); border-radius:2px; background:var(--panel); color:var(--ink); min-width:150px}
+#bList{display:grid; grid-template-columns:repeat(auto-fill,minmax(228px,1fr)); gap:1px;
+  background:var(--line); border:1px solid var(--line); border-radius:3px; overflow:hidden;
+  max-height:430px; overflow-y:auto}
+.prow{display:flex; align-items:center; gap:7px; padding:8px 11px; background:var(--panel);
+  border:none; cursor:pointer; text-align:left; font-family:"Source Sans 3",system-ui,sans-serif;
+  font-size:13px; color:var(--ink); width:100%}
+.prow:hover:not(:disabled){background:var(--panel-2)}
+.prow:disabled{opacity:.34; cursor:not-allowed}
+.prow.on{background:color-mix(in oklab,var(--teal) 15%,var(--panel))}
+.prow .bp{margin-left:auto; font-family:"IBM Plex Mono",monospace; font-size:12px; color:var(--ink-2)}
+.prow .be{font-family:"IBM Plex Mono",monospace; font-size:12px; font-weight:600; color:var(--teal);
+  min-width:24px; text-align:right}
+.tbadge{font-size:12.5px; color:var(--ink-3)}
+
 /* gameweek tabs */
 .tabs{display:flex; gap:3px; overflow-x:auto; border-bottom:2px solid var(--ink); padding-bottom:0}
 .tab{flex:0 0 auto; padding:8px 15px 7px; font-family:Archivo,system-ui,sans-serif; font-weight:700;
@@ -529,6 +566,9 @@ def render(ctx, path):
     P = []
     A = P.append
 
+    # Declared here, not left to the host: opening the file from disk or from a
+    # server that omits the charset otherwise renders every pound sign as mojibake.
+    A('<meta charset="utf-8">')
     A('<title>%s</title>' % esc(ctx["title"]))
     A('<link rel="preconnect" href="https://fonts.googleapis.com">')
     A('<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>')
@@ -538,13 +578,66 @@ def render(ctx, path):
     A("<style>%s</style>" % CSS)
     A('<div class="wrap">')
 
+    # ---- start screen (first visit, or after "use a different team")
+    A('<div id="startScreen" hidden><div class="start">')
+    A('<div><div class="eyebrow">Fantasy Premier League &middot; %s</div>'
+      "<h1>Set up your team</h1></div>" % esc(ctx["season"]))
+    A('<p class="lede">This desk projects the next five gameweeks, plans your transfers deadline '
+      "by deadline, and simulates the result thousands of times. It needs a squad to work from.</p>")
+    A('<div class="choices">')
+    A('<button class="choice primary" id="usePublished" type="button"><b>Use team %s</b>'
+      "<span>The squad this site is built for, synced from FPL on the server every six hours. "
+      "Best if it is your team, or you just want to look around.</span></button>"
+      % esc(ctx["provenance"].get("team_id") or "-"))
+    A('<button class="choice" id="startBuild" type="button"><b>Build a new team</b>'
+      "<span>Pick fifteen players against the real &pound;100.0m budget, two-five-five-three "
+      "shape and three-per-club limit. Everything on the page then runs off your squad.</span>"
+      "</button>")
+    A("</div>")
+    A('<p class="note">A note on live syncing: the FPL API sends no cross-origin header, so this '
+      "page cannot read your team straight from your browser &mdash; no site can. A squad you build "
+      "here is saved in this browser. To have a team synced automatically instead, put its id in "
+      "<code>config.json</code> in the repository and the six-hourly job will do it.</p>")
+    A("</div></div>")
+
+    # ---- squad builder
+    A('<div id="builder" hidden><div class="start" style="max-width:none">')
+    A('<div class="bhead"><div><div class="eyebrow">Build a squad</div>'
+      "<h1 style=\"font-size:30px\">Pick your fifteen</h1></div>"
+      '<div style="display:flex;gap:8px">'
+      '<button class="tg" id="bAuto" type="button">Auto-fill</button>'
+      '<button class="tg" id="bClear" type="button">Clear</button>'
+      '<button class="tg" id="bDone" type="button" disabled>Pick 15 more</button></div></div>')
+    A('<div class="kpis" id="bStats"></div>')
+    A('<div class="bfilters">'
+      '<button data-et="1" aria-pressed="true" type="button">GK</button>'
+      '<button data-et="2" aria-pressed="false" type="button">DEF</button>'
+      '<button data-et="3" aria-pressed="false" type="button">MID</button>'
+      '<button data-et="4" aria-pressed="false" type="button">FWD</button>'
+      '<input type="search" id="bSearch" placeholder="Search name or club" aria-label="Search players">'
+      '<label for="bSort">Sort</label>'
+      '<select id="bSort"><option value="ep">Projected points</option>'
+      '<option value="value">Points per &pound;m</option>'
+      '<option value="price">Price</option></select></div>')
+    A('<div id="bList"></div>')
+    A('<p class="note">Greyed-out players would break a rule: the position is full, they cost more '
+      "than you have left, or you already hold three from that club. Auto-fill builds a legal squad "
+      "on points per million, which is a starting point rather than an answer.</p>")
+    A("</div></div>")
+
+    A('<div id="appBody">')
+
     # ---- header
     A('<header><div>')
     A('<div class="eyebrow">Fantasy Premier League &middot; %s</div>' % esc(ctx["season"]))
     A("<h1>%s</h1>" % esc(ctx["headline"]))
+    A('<div class="tbadge" id="teamBadge" style="margin-top:7px"></div>')
     A('</div><div class="hmeta">')
     for lab, val in ctx["header_meta"]:
         A('<div><span class="eyebrow">%s</span><b class="num">%s</b></div>' % (esc(lab), esc(val)))
+    A('<div style="display:flex;gap:8px;align-self:flex-end">'
+      '<button class="tg" id="rebuildTeam" type="button">Edit squad</button>'
+      '<button class="tg" id="switchTeam" type="button">Use a different team</button></div>')
     A("</div></header>")
 
     # ---- verdict
@@ -619,6 +712,7 @@ def render(ctx, path):
         # view 2 - per player
         ps = ctx.get("player_sim")
         A('<div class="vpanel" role="tabpanel" id="sv-player" aria-labelledby="sv-player-t" hidden>')
+        A('<div id="playerHost">')
         if ps:
             A('<div class="tw"><table class="pgrid"><thead><tr><th>Player</th><th>Pos</th>'
               '<th class="n">&pound;</th>')
@@ -635,6 +729,8 @@ def render(ctx, path):
                 A('<td class="n">%.0f</td><td class="vpm">%.1f</td><td>%s</td></tr>'
                   % (r["total"]["median"], r["per_m"], r["role"]))
             A("</tbody></table></div>")
+        A("</div>")
+        if ps:
             A('<p class="note">%s</p>' % ps["note"])
         A("</div>")
 
@@ -654,8 +750,10 @@ def render(ctx, path):
     if ctx.get("week_tabs"):
         A('<section><div class="shead"><h2>The plan, week by week</h2>'
           '<p>%s</p></div>' % ctx["week_tabs_sub"])
+        A('<p class="note" id="planSummary"></p>')
+        A('<div id="weekHost">')
         A(week_panels(ctx["week_tabs"], gws))
-        A("</section>")
+        A("</div></section>")
 
     # ---- squad
     A('<section><div class="shead"><h2>Your squad, week by week</h2>'
@@ -761,6 +859,7 @@ def render(ctx, path):
     A("</div>")
 
     # ---- method
+    A("</div>")   # /appBody
     A("<footer><span class=\"eyebrow\">How these numbers are made</span>")
     A('<p class="note">%s</p>' % ctx["method"])
     A("</footer></div>")

@@ -101,6 +101,29 @@ ids are already public on the game's own leaderboards, so this leaks nothing new
 you would rather it stay private, keep using the Claude artifact instead, or put
 the repo on a paid plan where Pages can serve from a private repo.
 
+## Whose team is it?
+
+The page opens on a start screen the first time anyone visits, offering two
+routes:
+
+- **Use the configured team** — squad, bank and value synced from FPL on the
+  server every six hours. That is team 7561127 here.
+- **Build a new team** — pick fifteen players in the browser against the real
+  £100.0m budget, the 2/5/5/3 shape and the three-per-club cap.
+
+Whichever you choose is saved in that browser's `localStorage`, and **everything
+recomputes from it**: the rolling gameweek plan, the transfer search, the
+per-player grid, the simulation and the headline numbers. "Use a different team"
+in the header clears it and returns to the start screen.
+
+### Why you cannot just type in a team id
+
+No FPL endpoint sends an `access-control-allow-origin` header — not
+`bootstrap-static`, not `entry`, not `picks`. A browser therefore cannot read
+anyone's team directly, and no purely client-side site can. Syncing a team has
+to happen server-side, which is what `config.json` plus the scheduled job does.
+The squad builder exists so that anyone else still gets a working tool.
+
 ## Your live squad
 
 `config.json` carries team id **7561127**, so squad, bank, team value and
