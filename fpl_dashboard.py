@@ -29,6 +29,9 @@ CSS = """
   --chip:#222d27; --shadow:0 1px 2px rgba(0,0,0,.4),0 8px 24px -16px rgba(0,0,0,.7);
 }
 *{box-sizing:border-box}
+/* Must outrank every display rule below - a .panel{display:grid} silently
+   beats the user-agent [hidden] style and leaves every tab panel on screen. */
+[hidden]{display:none !important}
 body{
   background:var(--bg); color:var(--ink); margin:0;
   font-family:"Source Sans 3","Segoe UI",system-ui,sans-serif;
@@ -138,6 +141,7 @@ td.n,th.n{text-align:right; font-family:"IBM Plex Mono",monospace; font-variant-
 .tab[aria-selected="true"]{background:var(--ink); color:var(--bg); border-color:var(--ink)}
 .tab:focus-visible{outline:2px solid var(--teal); outline-offset:-2px}
 .panel{padding-top:16px; display:grid; grid-template-columns:1fr 300px; gap:16px; align-items:start}
+.vpanel{padding-top:16px; display:flex; flex-direction:column; gap:14px}
 @media (max-width:820px){ .panel{grid-template-columns:1fr} }
 
 .act{border:1px solid var(--line); border-left:5px solid var(--teal); border-radius:3px;
@@ -293,25 +297,27 @@ button.tg:focus-visible{outline:2px solid var(--teal); outline-offset:2px}
 
 TAB_JS = """
 (function(){
-  var bar=document.querySelector('.tabs'); if(!bar) return;
-  var tabs=[].slice.call(bar.querySelectorAll('.tab'));
-  function show(i){
-    tabs.forEach(function(t,j){
-      var on=i===j;
-      t.setAttribute('aria-selected',String(on));
-      t.tabIndex=on?0:-1;
-      document.getElementById(t.getAttribute('aria-controls')).hidden=!on;
-    });
-  }
-  tabs.forEach(function(t,i){
-    t.addEventListener('click',function(){ show(i); });
-    t.addEventListener('keydown',function(e){
-      var n=null;
-      if(e.key==='ArrowRight') n=(i+1)%tabs.length;
-      else if(e.key==='ArrowLeft') n=(i-1+tabs.length)%tabs.length;
-      else if(e.key==='Home') n=0;
-      else if(e.key==='End') n=tabs.length-1;
-      if(n!==null){ e.preventDefault(); show(n); tabs[n].focus(); }
+  document.querySelectorAll('[role="tablist"]').forEach(function(bar){
+    var tabs=[].slice.call(bar.querySelectorAll('[role="tab"]'));
+    if(!tabs.length) return;
+    function show(i){
+      tabs.forEach(function(t,j){
+        var on=i===j, panel=document.getElementById(t.getAttribute('aria-controls'));
+        t.setAttribute('aria-selected',String(on));
+        t.tabIndex=on?0:-1;
+        if(panel) panel.hidden=!on;
+      });
+    }
+    tabs.forEach(function(t,i){
+      t.addEventListener('click',function(){ show(i); });
+      t.addEventListener('keydown',function(e){
+        var n=null;
+        if(e.key==='ArrowRight') n=(i+1)%tabs.length;
+        else if(e.key==='ArrowLeft') n=(i-1+tabs.length)%tabs.length;
+        else if(e.key==='Home') n=0;
+        else if(e.key==='End') n=tabs.length-1;
+        if(n!==null){ e.preventDefault(); show(n); tabs[n].focus(); }
+      });
     });
   });
 })();
@@ -562,11 +568,11 @@ def render(ctx, path):
         A('<div class="prov %s"><div><span class="eyebrow">Where these inputs come from</span>'
           '<p>%s</p></div></div>' % ("synced" if pv["synced"] else "assumed", pv["text"]))
 
-    # ---- live simulation
+    # ---- simulation, tabbed
     if ctx.get("payload"):
-        A('<section><div class="shead"><h2>Live simulation</h2>'
-          '<p>Runs in your browser. Change the captain or swap a player and the '
-          'distribution is recomputed on the spot.</p></div>')
+        A('<section><div class="shead"><h2>Simulation</h2>'
+          '<p>Every number here is resampled in your browser. Change a captain or swap a '
+          'player and all three views recompute together.</p></div>')
         A('<div class="ctl">'
           '<label for="liveRuns">Runs</label>'
           '<select id="liveRuns"><option value="1000">1,000</option>'
@@ -583,6 +589,20 @@ def render(ctx, path):
             A('<div class="kpi" id="%s"><span class="v">%s</span><span class="s">%s</span></div>'
               % (tid, val, sub))
         A("</div>")
+
+        views = [("sv-week", "By gameweek", "Spread of the squad total, week by week"),
+                 ("sv-player", "By player", "Who actually produces the points"),
+                 ("sv-value", "By value", "Points against price, per position")]
+        A('<div class="tabs" role="tablist" aria-label="Simulation views">')
+        for i, (vid, lab, sub) in enumerate(views):
+            A('<button class="tab" role="tab" id="%s-t" aria-controls="%s" aria-selected="%s" '
+              'tabindex="%d" type="button">%s<span class="sub">%s</span></button>'
+              % (vid, vid, "true" if i == 0 else "false", 0 if i == 0 else -1,
+                 esc(lab), esc(sub)))
+        A("</div>")
+
+        # view 1 - weekly spread
+        A('<div class="vpanel" role="tabpanel" id="sv-week" aria-labelledby="sv-week-t">')
         A('<div class="dist"><div class="drow head"><span>Week</span>'
           '<span>10th &rarr; 90th percentile &middot; box is the middle half</span>'
           '<span style="text-align:right">Median</span><span>Captain</span></div>')
@@ -594,6 +614,40 @@ def render(ctx, path):
         A("</div></div>")
         if sim:
             A('<p class="note">%s</p>' % sim["note"])
+        A("</div>")
+
+        # view 2 - per player
+        ps = ctx.get("player_sim")
+        A('<div class="vpanel" role="tabpanel" id="sv-player" aria-labelledby="sv-player-t" hidden>')
+        if ps:
+            A('<div class="tw"><table class="pgrid"><thead><tr><th>Player</th><th>Pos</th>'
+              '<th class="n">&pound;</th>')
+            for g in gws:
+                A('<th class="gw" style="text-align:center">GW%d</th>' % g)
+            A('<th class="n">5&#8209;GW</th><th class="n">Per &pound;m</th><th>Role</th></tr>'
+              "</thead><tbody>")
+            for r in ps["rows"]:
+                A('<tr><td><span class="pname">%s</span><span class="tm">%s</span>%s</td>'
+                  '<td><span class="pos">%s</span></td><td class="n">%.1f</td>'
+                  % (esc(r["name"]), esc(r["team"]), r["duty"], esc(r["pos"]), r["price"]))
+                for g in gws:
+                    A('<td>%s</td>' % pcell(r["gw"].get(g), ps["cell_max"]))
+                A('<td class="n">%.0f</td><td class="vpm">%.1f</td><td>%s</td></tr>'
+                  % (r["total"]["median"], r["per_m"], r["role"]))
+            A("</tbody></table></div>")
+            A('<p class="note">%s</p>' % ps["note"])
+        A("</div>")
+
+        # view 3 - value by position
+        vf = ctx.get("value_facets")
+        A('<div class="vpanel" role="tabpanel" id="sv-value" aria-labelledby="sv-value-t" hidden>')
+        if vf:
+            A('<div class="facets">')
+            for f in vf["panels"]:
+                A(scatter(f["title"], f["rows"], vf["mine"]))
+            A("</div>")
+            A('<p class="note">%s</p>' % vf["note"])
+        A("</div>")
         A("</section>")
 
     # ---- week-by-week plan, tabbed
@@ -601,42 +655,6 @@ def render(ctx, path):
         A('<section><div class="shead"><h2>The plan, week by week</h2>'
           '<p>%s</p></div>' % ctx["week_tabs_sub"])
         A(week_panels(ctx["week_tabs"], gws))
-        A("</section>")
-
-    # ---- per-player simulation
-    ps = ctx.get("player_sim")
-    if ps:
-        A('<section><div class="shead"><h2>Every player, every gameweek</h2>'
-          '<p>Simulated points per player per week. The bar spans the 10th to 90th '
-          'percentile, the tick is the median, and captaincy is already counted.</p></div>')
-        A('<div class="tw"><table class="pgrid"><thead><tr><th>Player</th><th>Pos</th>'
-          '<th class="n">&pound;</th>')
-        for g in gws:
-            A('<th class="gw" style="text-align:center">GW%d</th>' % g)
-        A('<th class="n">5&#8209;GW</th><th class="n">Per &pound;m</th><th>Role</th></tr></thead><tbody>')
-        for r in ps["rows"]:
-            A('<tr><td><span class="pname">%s</span><span class="tm">%s</span>%s</td>'
-              '<td><span class="pos">%s</span></td><td class="n">%.1f</td>'
-              % (esc(r["name"]), esc(r["team"]), r["duty"], esc(r["pos"]), r["price"]))
-            for g in gws:
-                A('<td>%s</td>' % pcell(r["gw"].get(g), ps["cell_max"]))
-            A('<td class="n">%.0f</td><td class="vpm">%.1f</td><td>%s</td></tr>'
-              % (r["total"]["median"], r["per_m"], r["role"]))
-        A("</tbody></table></div>")
-        A('<p class="note">%s</p>' % ps["note"])
-        A("</section>")
-
-    # ---- value by position
-    vf = ctx.get("value_facets")
-    if vf:
-        A('<section><div class="shead"><h2>Value by position</h2>'
-          '<p>Projected points against price, one panel per position. '
-          'Your players are marked; the faint dots are everyone else worth owning.</p></div>')
-        A('<div class="facets">')
-        for f in vf["panels"]:
-            A(scatter(f["title"], f["rows"], vf["mine"]))
-        A("</div>")
-        A('<p class="note">%s</p>' % vf["note"])
         A("</section>")
 
     # ---- squad
