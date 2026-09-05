@@ -161,7 +161,6 @@ def main():
     rep = A.squad_report(squad, gws)
     base = sum(r["total"] for r in rep)
     singles, _ = A.single_transfers(squad, pool, gws, bank, limit=6)
-    dbl, _ = A.double_transfer(squad, pool, gws, bank, shortlist=5)
     sval = sum(p["price"] for p in squad)
     wc, wcval = A.build_squad(pool, gws, sval + bank)
 
@@ -199,14 +198,29 @@ def main():
             "The Wildcard does it in one move, and it expires at GW19, so spending it on a six-slot repair "
             "is what the chip is for." % (len(broken), (len(broken) - 1) * 4),
         ]
-    elif mode == "double":
-        call = "Two transfers: %s and %s out." % (dbl["moves"][0]["out"]["name"], dbl["moves"][1]["out"]["name"])
-        body = ["Together they add %.0f points across the window%s." %
-                (dbl["gain"], "" if ft >= 2 else ", or %.0f after the 4-point hit" % (dbl["gain"] - 4))]
+    elif mode == "transfers":
+        n = len(ftplan["moves"])
+        call = ("Use %d of your %d free transfers. Keep the Wildcard." % (n, ft)
+                if ft > 1 else
+                "One transfer: %s → %s." % (ftplan["moves"][0]["out"]["name"],
+                                            ftplan["moves"][0]["in"]["name"]))
+        body = [
+            "They cost nothing and add about <b>%.0f points</b> across GW%d&ndash;%d: %s."
+            % (ftplan["gain"], gws[0], gws[-1],
+               ", ".join("%s &rarr; %s" % (m["out"]["name"], m["in"]["name"])
+                         for m in ftplan["moves"])),
+        ]
+        if not wc_used:
+            body.append(
+                "A full Wildcard rebuild is worth %.0f over the same window, so the chip buys only "
+                "<b>%.0f more points</b> than the free moves you already have banked. That is not "
+                "enough to spend a chip which stays available until GW19 &mdash; hold it for an "
+                "injury pile-up, a fixture swing or a double gameweek, and keep banking a transfer "
+                "a week in the meantime." % (wc_gain, wc_edge))
     else:
-        call = "One transfer: %s → %s." % (top["out"]["name"], top["in"]["name"]) if top else "Hold your transfer."
-        body = ["Worth about %.0f points over the window." % top["gain"]] if top else \
-               ["No single move clears the noise this week. Bank the transfer."]
+        call = "Hold. Bank the transfer."
+        body = ["Nothing on the board clears the noise this week, and you have %d free transfer%s "
+                "banked for when something does." % (ft, "" if ft == 1 else "s")]
 
     if dead:
         body.append("Non-negotiable either way: <b>%s</b> %s dead weight &mdash; %s."
