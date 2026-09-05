@@ -246,6 +246,30 @@ input[type=search]{font-family:"Source Sans 3",system-ui,sans-serif; font-size:1
   min-width:24px; text-align:right}
 .tbadge{font-size:12.5px; color:var(--ink-3)}
 
+/* add-team-by-id form */
+.idform{background:var(--panel); border:1px solid var(--line); border-left:5px solid var(--violet);
+  border-radius:3px; padding:18px 19px; display:flex; flex-direction:column; gap:12px}
+.idform h3{font-family:Archivo,system-ui,sans-serif; font-size:17px; font-weight:800; color:var(--ink);
+  letter-spacing:-.01em}
+.idrow{display:flex; gap:9px; align-items:center; flex-wrap:wrap}
+.idform input[type=number]{font-family:"IBM Plex Mono",monospace; font-size:15px; padding:7px 10px;
+  border:1px solid var(--line-2); border-radius:2px; background:var(--bg); color:var(--ink); width:150px}
+.idform textarea{font-family:"IBM Plex Mono",monospace; font-size:11.5px; padding:9px 10px;
+  border:1px solid var(--line-2); border-radius:2px; background:var(--bg); color:var(--ink);
+  min-height:96px; resize:vertical; width:100%}
+.idform input:focus-visible, .idform textarea:focus-visible{outline:2px solid var(--teal); outline-offset:1px}
+.steps{margin:0; padding-left:20px; display:flex; flex-direction:column; gap:6px; font-size:13.5px;
+  color:var(--ink-2); line-height:1.5}
+.steps b{color:var(--ink)}
+.openlink{display:inline-flex; align-items:center; gap:6px; font-family:Archivo,system-ui,sans-serif;
+  font-size:11.5px; font-weight:700; letter-spacing:.06em; text-transform:uppercase; padding:7px 12px;
+  border-radius:2px; background:var(--ink); color:var(--bg); text-decoration:none}
+.openlink[aria-disabled="true"]{opacity:.4; pointer-events:none}
+.msg{font-size:13px; padding:9px 11px; border-radius:2px; display:none}
+.msg.show{display:block}
+.msg.err{background:color-mix(in oklab,var(--rust) 14%,var(--panel)); color:var(--rust)}
+.msg.ok{background:color-mix(in oklab,var(--teal) 14%,var(--panel)); color:var(--teal)}
+
 /* gameweek tabs */
 .tabs{display:flex; gap:3px; overflow-x:auto; border-bottom:2px solid var(--ink); padding-bottom:0}
 .tab{flex:0 0 auto; padding:8px 15px 7px; font-family:Archivo,system-ui,sans-serif; font-weight:700;
@@ -687,11 +711,35 @@ def render(ctx, path):
       "<span>The squad this site is built for, synced from FPL on the server every six hours. "
       "Best if it is your team, or you just want to look around.</span></button>"
       % esc(ctx["provenance"].get("team_id") or "-"))
+    A('<button class="choice" id="startById" type="button"><b>Add your team by ID</b>'
+      "<span>Load the real squad behind any FPL team number. Takes one copy and paste, "
+      "because the FPL API refuses to talk to a browser directly.</span></button>")
     A('<button class="choice" id="startBuild" type="button"><b>Build a new team</b>'
       "<span>Pick fifteen players against the real &pound;100.0m budget, two-five-five-three "
       "shape and three-per-club limit. Everything on the page then runs off your squad.</span>"
       "</button>")
     A("</div>")
+    A('<div class="idform" id="byId" hidden>')
+    A("<h3>Load a team by its FPL number</h3>")
+    A('<ol class="steps">'
+      "<li>Put your team number in the box. It is the number in the address when you view your own "
+      "team on the FPL site: <code>/entry/<b>7561127</b>/event/3</code>.</li>"
+      "<li>Press <b>Open my team data</b>. A tab opens showing your squad as raw data.</li>"
+      "<li>Select all of it (<b>Ctrl+A</b>, then <b>Ctrl+C</b>) and paste it below.</li>"
+      "</ol>")
+    A('<div class="idrow">'
+      '<label for="tidInput" class="eyebrow">Team number</label>'
+      '<input type="number" id="tidInput" inputmode="numeric" placeholder="7561127" '
+      'aria-label="FPL team number">'
+      '<a class="openlink" id="tidLink" href="#" target="_blank" rel="noopener" '
+      'aria-disabled="true">Open my team data &#8599;</a></div>')
+    A('<textarea id="tidPaste" spellcheck="false" '
+      'placeholder="Paste the whole page here" aria-label="Paste your team data"></textarea>')
+    A('<div class="idrow"><button class="tg" id="tidLoad" type="button">Load squad</button>'
+      '<button class="tg" id="tidBack" type="button">Back</button></div>')
+    A('<div class="msg" id="tidMsg" role="status"></div>')
+    A("</div>")
+
     A('<p class="note">A note on live syncing: the FPL API sends no cross-origin header, so this '
       "page cannot read your team straight from your browser &mdash; no site can. A squad you build "
       "here is saved in this browser. To have a team synced automatically instead, put its id in "
@@ -737,6 +785,7 @@ def render(ctx, path):
     for lab, val in ctx["header_meta"]:
         A('<div><span class="eyebrow">%s</span><b class="num">%s</b></div>' % (esc(lab), esc(val)))
     A('<div style="display:flex;gap:8px;align-self:flex-end">'
+      '<button class="tg" id="loadById" type="button">Load by ID</button>'
       '<button class="tg" id="rebuildTeam" type="button">Edit squad</button>'
       '<button class="tg" id="switchTeam" type="button">Use a different team</button></div>')
     A("</div></header>")

@@ -81,6 +81,7 @@ def status_html(p):
 
 
 SCORING_JS = None
+CURRENT_GW = [1]
 
 
 def export_payload(squad, pool, gws, cfg, synced, bank, ft):
@@ -117,6 +118,7 @@ def export_payload(squad, pool, gws, cfg, synced, bank, ft):
         players[str(p["id"])] = pack(p)
     return {
         "gws": gws, "squad": sq_ids, "players": players, "scoring": SCORING_JS,
+        "current_gw": CURRENT_GW[0],
         "bank": bank, "ft": ft,
         "provenance": {
             "squad": "synced" if synced else "assumed",
@@ -139,6 +141,7 @@ def main():
     gws = list(range(nxt, min(nxt + HORIZON, 39)))
 
     global SCORING_JS
+    CURRENT_GW[0] = cur
     _sc = RULES.scoring(boot)
     SCORING_JS = {
         "long": _sc["appearance_long"], "short": _sc["appearance_short"],

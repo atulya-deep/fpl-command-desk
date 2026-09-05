@@ -619,6 +619,102 @@
       save(); boot();
     });
     $("#startBuild").addEventListener("click", function () { openBuilder(); });
+    $("#startById").addEventListener("click", function () { openById(); });
+  }
+
+  // ------------------------------------------------------- load by team id
+  function picksUrl(id) {
+    return "https://fantasy.premierleague.com/api/entry/" + id + "/event/" +
+           (DATA.current_gw || 1) + "/picks/";
+  }
+
+  function openById(fromApp) {
+    var st = $("#startScreen"), bd = $("#builder"), by = $("#byId");
+    if (st) st.hidden = false;
+    if (bd) bd.hidden = true;
+    if (fromApp) $("#appBody").hidden = true;
+    by.hidden = false;
+    by.scrollIntoView({ block: "center", behavior: "smooth" });
+
+    var input = $("#tidInput"), link = $("#tidLink"), msg = $("#tidMsg");
+    function syncLink() {
+      var id = (input.value || "").replace(/[^0-9]/g, "");
+      if (id) {
+        link.href = picksUrl(id);
+        link.setAttribute("aria-disabled", "false");
+      } else {
+        link.href = "#";
+        link.setAttribute("aria-disabled", "true");
+      }
+    }
+    input.oninput = syncLink;
+    syncLink();
+    input.focus();
+
+    $("#tidBack").onclick = function () {
+      by.hidden = true;
+      msg.className = "msg";
+      if (state) { $("#startScreen").hidden = true; $("#appBody").hidden = false; }
+    };
+    $("#tidLoad").onclick = function () { loadPasted(input, msg); };
+  }
+
+  function say(msg, text, ok) {
+    msg.className = "msg show " + (ok ? "ok" : "err");
+    msg.innerHTML = text;
+  }
+
+  function loadPasted(input, msg) {
+    var id = (input.value || "").replace(/[^0-9]/g, "");
+    var raw = ($("#tidPaste").value || "").trim();
+    if (!raw) return say(msg, "Nothing pasted yet. Open your team data, select it all, and paste it in.", false);
+
+    var data;
+    try {
+      data = JSON.parse(raw);
+    } catch (e) {
+      // tolerate a page copied with surrounding text
+      var a = raw.indexOf("{"), b = raw.lastIndexOf("}");
+      if (a < 0 || b <= a) return say(msg, "That does not look like team data. Paste everything from the tab that opened.", false);
+      try { data = JSON.parse(raw.slice(a, b + 1)); }
+      catch (e2) { return say(msg, "That did not parse. Make sure you copied the whole thing.", false); }
+    }
+
+    if (data && data.picks === undefined && data.summary_overall_points !== undefined) {
+      return say(msg, "That is your team's summary, not its squad. Use the <b>Open my team data</b> " +
+                      "button, which points at the picks for GW" + (DATA.current_gw || 1) + ".", false);
+    }
+    if (!data || !Array.isArray(data.picks) || !data.picks.length) {
+      return say(msg, "No squad found in that. It should start with <code>{\"active_chip\"</code> " +
+                      "and contain a <code>picks</code> list.", false);
+    }
+
+    var ids = data.picks.map(function (x) { return x.element; });
+    var missing = ids.filter(function (i) { return !P[i]; });
+    if (ids.length !== 15) {
+      return say(msg, "Found " + ids.length + " players, expected 15. Paste the whole thing.", false);
+    }
+    if (missing.length) {
+      return say(msg, missing.length + " of those players are not in this build&rsquo;s pool " +
+                      "(they may have left the league). Try again after the next refresh, or build the squad by hand.", false);
+    }
+
+    var bank = 0;
+    if (data.entry_history && typeof data.entry_history.bank === "number") {
+      bank = data.entry_history.bank / 10;
+    }
+    // free transfers are not in this payload; assume one and let the user adjust by re-planning
+    state = { squad: ids, bank: bank, ft: 1, teamId: id || null, source: "pasted" };
+    captains = {}; vices = {};
+    save();
+    say(msg, "Loaded 15 players" + (id ? " for team " + id : "") + ", &pound;" + bank.toFixed(1) +
+             " in the bank. Building your plan&hellip;", true);
+    setTimeout(function () {
+      $("#byId").hidden = true;
+      $("#tidPaste").value = "";
+      msg.className = "msg";
+      boot();
+    }, 700);
   }
 
   function openBuilder() {
@@ -738,14 +834,22 @@
     $("#appBody").hidden = false;
     var badge = $("#teamBadge");
     if (badge) {
-      badge.innerHTML = state.source === "published"
-        ? "Showing FPL team <b>" + esc(state.teamId) + "</b>, synced server-side."
-        : "Showing a squad you built here. Saved in this browser only.";
+      if (state.source === "published") {
+        badge.innerHTML = "Showing FPL team <b>" + esc(state.teamId) + "</b>, synced server-side.";
+      } else if (state.source === "pasted") {
+        badge.innerHTML = "Showing FPL team <b>" + esc(state.teamId || "?") +
+          "</b>, loaded from data you pasted. Saved in this browser &mdash; paste again after you " +
+          "make a transfer.";
+      } else {
+        badge.innerHTML = "Showing a squad you built here. Saved in this browser only.";
+      }
     }
     wireTabs(document);
     var rs = $("#liveRuns");
     if (rs) rs.onchange = function () { runs = +rs.value; recompute(); };
     var br = $("#liveRun"); if (br) br.onclick = recompute;
+    var lb = $("#loadById");
+    if (lb) lb.onclick = function () { openById(true); };
     var rb = $("#rebuildTeam");
     if (rb) rb.onclick = function () { openBuilder(); };
     var sw = $("#switchTeam");

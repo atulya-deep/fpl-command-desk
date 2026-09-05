@@ -127,6 +127,9 @@ routes:
 
 - **Use the configured team** — squad, bank and value synced from FPL on the
   server every six hours. That is team 7561127 here.
+- **Add your team by ID** - load the real squad behind any FPL team number. You
+  enter the number, press *Open my team data*, and paste what the tab shows.
+  One copy and paste, because of the CORS limit below.
 - **Build a new team** — pick fifteen players in the browser against the real
   £100.0m budget, the 2/5/5/3 shape and the three-per-club cap.
 
@@ -135,7 +138,24 @@ recomputes from it**: the rolling gameweek plan, the transfer search, the
 per-player grid, the simulation and the headline numbers. "Use a different team"
 in the header clears it and returns to the start screen.
 
-### Why you cannot just type in a team id
+### Why loading a team needs a copy and paste
+
+No FPL endpoint sends an `access-control-allow-origin` header - not
+`bootstrap-static`, not `entry`, not `picks` - so a browser refuses to read them
+from another site. Public CORS proxies were tried and rejected: `corsproxy.io`
+now answers 401 and `allorigins` failed outright, and routing your data through
+an unaccountable third party to save one paste is a bad trade.
+
+Navigation is not blocked, though. So *Open my team data* sends you to the real
+picks URL for the current gameweek, you copy what you see, and the page parses
+it locally. Nothing leaves your browser. The parser accepts the raw JSON, or
+text with the JSON somewhere inside it, and tells you plainly when the paste is
+the wrong endpoint, truncated, or empty.
+
+A pasted squad is a snapshot: paste again after you make a transfer. For a team
+that should stay current on its own, use `config.json` and the scheduled job.
+
+### The old note on team ids
 
 No FPL endpoint sends an `access-control-allow-origin` header — not
 `bootstrap-static`, not `entry`, not `picks`. A browser therefore cannot read
