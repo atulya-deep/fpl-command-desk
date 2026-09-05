@@ -34,6 +34,9 @@ def save_cfg(cfg):
         json.dump(cfg, f, indent=2)
 
 
+SYNCED = {"ok": False}
+
+
 def resolve_squad(cfg, byid, gw):
     """Prefer the live squad from the FPL API; fall back to the manual list."""
     tid = cfg.get("team_id")
@@ -46,6 +49,7 @@ def resolve_squad(cfg, byid, gw):
             cfg["squad"] = ids
             cfg["manager"] = ent.get("name") or cfg.get("manager")
             save_cfg(cfg)
+            SYNCED["ok"] = True
             print("  synced squad from FPL team %s (bank £%.1f)" % (tid, bank))
         except Exception as ex:
             print("  ! could not sync team %s (%s); using saved squad" % (tid, ex))
@@ -76,6 +80,52 @@ def status_html(p):
     return '<span class="pill ok">Fit</span>'
 
 
+SCORING_JS = None
+
+
+def export_payload(squad, pool, gws, cfg, synced, bank, ft):
+    """
+    Everything the in-browser simulator needs. The FPL API sends no CORS
+    header, so the page cannot fetch it directly - we ship the parameters
+    with the page instead and resample them client-side.
+    """
+    def pack(p):
+        g = {}
+        for gw in gws:
+            legs = p["fixt"].get(gw) or []
+            g[str(gw)] = [{
+                "tm": l["sim"]["team"], "opp": l["opp"], "h": 1 if l["home"] else 0,
+                "lg": round(l["sim"]["lam_g"], 4), "la": round(l["sim"]["lam_a"], 4),
+                "xga": round(l["sim"]["xga"], 3), "pdc": round(l["sim"]["p_dc"], 4),
+                "sv": round(l["sim"]["saves_mu"], 3), "bo": round(l["sim"]["bonus_mu"], 3),
+                "yc": round(l["sim"]["yc"], 4), "rc": round(l["sim"]["rc"], 5),
+            } for l in legs]
+        return {
+            "n": p["name"], "t": p["team_short"], "pos": p["pos"], "et": p["et"],
+            "pr": p["price"], "sel": p["sel"], "ps": round(p["p_start"], 4),
+            "ep": round(p["total"], 1), "pen": p["pen_order"] or 0,
+            "st": p["status"], "gw": g,
+        }
+
+    sq_ids = [p["id"] for p in squad]
+    # squad plus a deep enough bench of alternatives to make swaps meaningful
+    extra = [p for p in sorted(pool, key=lambda x: -x["total"])
+             if p["id"] not in sq_ids and p["avail"] > 0.5 and p["n_fix"] > 0][:140]
+    players = {}
+    for p in squad + extra:
+        players[str(p["id"])] = pack(p)
+    return {
+        "gws": gws, "squad": sq_ids, "players": players, "scoring": SCORING_JS,
+        "bank": bank, "ft": ft,
+        "provenance": {
+            "squad": "synced" if synced else "assumed",
+            "team_id": cfg.get("team_id"),
+            "chips": cfg.get("chips", {}),
+        },
+        "generated": datetime.datetime.now(datetime.timezone.utc).strftime("%Y-%m-%dT%H:%M:%SZ"),
+    }
+
+
 def main():
     args = sys.argv[1:]
     offline = "--offline" in args
@@ -86,6 +136,15 @@ def main():
     if "--gw" in args:
         nxt = int(args[args.index("--gw") + 1])
     gws = list(range(nxt, min(nxt + HORIZON, 39)))
+
+    global SCORING_JS
+    _sc = RULES.scoring(boot)
+    SCORING_JS = {
+        "long": _sc["appearance_long"], "short": _sc["appearance_short"],
+        "goals": _sc["goals"], "cs": _sc["clean_sheet"], "conc": _sc["conceded"],
+        "dc": _sc["dc"], "assist": _sc["assist"], "save": _sc["save"],
+        "bonus": _sc["bonus"], "yellow": _sc["yellow"], "red": _sc["red"],
+    }
 
     print("Projecting GW%d-%d ..." % (gws[0], gws[-1]))
     pool, R, lavg, fx = M.project(boot, fixt, gws[0], gws[-1])
@@ -303,6 +362,22 @@ def main():
         ],
         "gws": gws,
         "sim": sim_ctx,
+        "payload": export_payload(squad, pool, gws, cfg, SYNCED["ok"], bank, ft),
+        "live_js": open(os.path.join(HERE, "live_sim.js"), encoding="utf-8").read(),
+        "provenance": {
+            "synced": SYNCED["ok"],
+            "text": (
+                ("Squad, bank and team value are <b>synced live</b> from FPL team "
+                 "%s, so this page reflects the team you actually own." % cfg.get("team_id"))
+                if SYNCED["ok"] else
+                ("<b>This squad is assumed, not synced.</b> It was entered by hand and has not been "
+                 "checked against your real team, and the bank (&pound;%.1f), free transfers (%d) "
+                 "and chip status are assumptions too &mdash; so any of them can be wrong, and every "
+                 "transfer recommendation below inherits that. Put your FPL team id in "
+                 "<code>config.json</code> and all four sync themselves on the next refresh."
+                 % (bank, ft))
+            ),
+        },
         "verdict": {"call": call, "body": body},
         "kpis": [
             ("Simulated GW%d-%d" % (gws[0], gws[-1]), "%.0f" % sim_now["total"]["median"],

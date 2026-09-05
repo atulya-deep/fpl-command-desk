@@ -128,6 +128,35 @@ td.n,th.n{text-align:right; font-family:"IBM Plex Mono",monospace; font-variant-
   text-align:right; color:var(--ink-2)}
 .dnum b{color:var(--ink); font-size:14px}
 
+/* provenance banner */
+.prov{display:flex; gap:12px; align-items:flex-start; padding:13px 16px; border-radius:3px;
+  border:1px solid var(--line); background:var(--panel); font-size:13px; color:var(--ink-2)}
+.prov.assumed{border-left:5px solid var(--amber)}
+.prov.synced{border-left:5px solid var(--teal)}
+.prov b{color:var(--ink)}
+.prov p{margin:0; max-width:80ch}
+
+/* live simulation controls */
+.ctl{display:flex; gap:10px; align-items:center; flex-wrap:wrap; padding:12px 15px;
+  background:var(--panel-2); border:1px solid var(--line); border-radius:3px}
+.ctl label{font-family:Archivo,system-ui,sans-serif; font-size:10.5px; letter-spacing:.09em;
+  text-transform:uppercase; color:var(--ink-3)}
+select, .ctl button{font-family:"Source Sans 3",system-ui,sans-serif; font-size:13px;
+  padding:5px 9px; border:1px solid var(--line-2); border-radius:2px; background:var(--panel);
+  color:var(--ink)}
+.ctl button{font-family:Archivo,system-ui,sans-serif; font-size:11px; font-weight:700;
+  letter-spacing:.07em; text-transform:uppercase; cursor:pointer}
+.ctl button:hover:not(:disabled){background:var(--ink); color:var(--bg); border-color:var(--ink)}
+.ctl button:disabled{opacity:.55; cursor:progress}
+select:focus-visible, button:focus-visible{outline:2px solid var(--teal); outline-offset:2px}
+.capsel{font-size:12px; padding:3px 6px; max-width:132px}
+.drow{grid-template-columns:54px 1fr 108px 136px}
+.drow.head{grid-template-columns:54px 1fr 108px 136px}
+@media (max-width:720px){
+  .drow, .drow.head{grid-template-columns:44px 1fr 92px; }
+  .capsel{display:none}
+}
+
 /* legend */
 .legend{display:flex; align-items:center; gap:9px; font-size:12px; color:var(--ink-3); flex-wrap:wrap}
 .ramp{display:flex; height:11px; border-radius:2px; overflow:hidden; width:150px; border:1px solid var(--line)}
@@ -290,6 +319,39 @@ def render(ctx, path):
           '<span class="s">%s</span></div>' % (esc(k[0]), esc(k[1]), esc(k[2])))
     A("</div>")
 
+    # ---- provenance
+    pv = ctx.get("provenance")
+    if pv:
+        A('<div class="prov %s"><div><span class="eyebrow">Where these inputs come from</span>'
+          '<p>%s</p></div></div>' % ("synced" if pv["synced"] else "assumed", pv["text"]))
+
+    # ---- live simulation
+    if ctx.get("payload"):
+        A('<section><div class="shead"><h2>Live simulation</h2>'
+          '<p>Runs in your browser. Change the captain or swap a player and the '
+          'distribution is recomputed on the spot.</p></div>')
+        A('<div class="ctl">'
+          '<label for="liveRuns">Runs</label>'
+          '<select id="liveRuns"><option value="1000">1,000</option>'
+          '<option value="3000" selected>3,000</option>'
+          '<option value="10000">10,000</option></select>'
+          '<label for="swapOut">Swap</label><select id="swapOut"></select>'
+          '<span style="color:var(--ink-3)">&rarr;</span><select id="swapIn"></select>'
+          '<button id="liveSwap" type="button">Apply</button>'
+          '<button id="liveReset" type="button">Reset</button>'
+          '<button id="liveRun" type="button">Re-run</button></div>')
+        A('<div class="kpis">'
+          '<div class="kpi" id="liveHead"><span class="v">&mdash;</span><span class="s">simulating&hellip;</span></div>'
+          '<div class="kpi" id="liveRange"><span class="v">&mdash;</span><span class="s">&nbsp;</span></div>'
+          '<div class="kpi" id="liveCap"><span class="v">&mdash;</span><span class="s">&nbsp;</span></div>'
+          '<div class="kpi" id="liveSubs"><span class="v">&mdash;</span><span class="s">&nbsp;</span></div>'
+          "</div>")
+        A('<div class="dist"><div class="drow head"><span>Week</span>'
+          '<span>10th &rarr; 90th percentile &middot; box is the middle half</span>'
+          '<span style="text-align:right">Median</span><span>Captain</span></div>'
+          '<div id="liveRows"></div></div>')
+        A("</section>")
+
     # ---- simulation
     sim = ctx.get("sim")
     if sim:
@@ -424,6 +486,10 @@ def render(ctx, path):
     A('<p class="note">%s</p>' % ctx["method"])
     A("</footer></div>")
     A("<script>%s</script>" % JS)
+    if ctx.get("payload"):
+        A('<script type="application/json" id="simdata">%s</script>'
+          % json.dumps(ctx["payload"], separators=(",", ":")).replace("</", "<\/"))
+        A("<script>%s</script>" % ctx["live_js"])
 
     with open(path, "w", encoding="utf-8") as f:
         f.write("\n".join(P))

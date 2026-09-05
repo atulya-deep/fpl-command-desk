@@ -1,9 +1,11 @@
-name: Weekly dashboard refresh
+name: Dashboard refresh
 
 on:
   schedule:
-    # 08:00 UTC every Wednesday. Cron here is always UTC, never local time.
-    - cron: "0 8 * * 3"
+    # Every six hours. Prices settle around 01:30 UTC and injury news lands
+    # through the day, so a weekly rebuild was always showing stale news.
+    # Cron here is always UTC, never local time.
+    - cron: "0 */6 * * *"
   workflow_dispatch:        # lets you trigger a run by hand from the Actions tab
 
 permissions:
@@ -32,9 +34,13 @@ jobs:
         run: |
           git config user.name  "github-actions[bot]"
           git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
-          if git diff --quiet -- dashboard.html index.html history; then
-            echo "No change in the projections - nothing to publish."
-            exit 0
+          # The generated timestamp always changes, so compare the substance.
+          if git diff --quiet -- history; then
+            if ! git diff -- index.html | grep -qE '^[+-].*(pname|hc |drow|call|kpi)'; then
+              echo "Projections unchanged - nothing worth publishing."
+              git checkout -- dashboard.html index.html 2>/dev/null || true
+              exit 0
+            fi
           fi
           git add dashboard.html index.html history
           git commit -m "Dashboard refresh $(date -u '+%Y-%m-%d')"

@@ -24,10 +24,13 @@ settled.
 
 ## The weekly run happens in the cloud
 
-`.github/workflows/refresh.yml` runs on GitHub's servers every **Wednesday at
-08:00 UTC**. It rebuilds the dashboard from live FPL data, commits it, and
-pushes — which makes Pages redeploy. Nothing on your machine needs to be
-switched on.
+`.github/workflows/refresh.yml` runs on GitHub's servers **every six hours**. It
+rebuilds the dashboard from live FPL data, commits it, and pushes — which makes
+Pages redeploy. Nothing on your machine needs to be switched on.
+
+Six-hourly rather than weekly because prices settle around 01:30 UTC and injury
+news lands through the day: a weekly rebuild spent most of its life showing news
+that had already moved on.
 
 ```powershell
 gh workflow run refresh.yml            # trigger a run right now
@@ -40,9 +43,9 @@ edit the `cron` line — it is always UTC, never local time:
 
 | Cron | Meaning |
 | --- | --- |
-| `0 8 * * 3` | Wednesdays 08:00 UTC (current) |
-| `0 8 * * 2,5` | Tuesdays and Fridays — catches late injury news before a deadline |
-| `0 8 * * *` | Daily |
+| `0 */6 * * *` | Every six hours (current) |
+| `0 8 * * *` | Once daily, 08:00 UTC |
+| `0 8 * * 2,5` | Tuesdays and Fridays only |
 
 GitHub pauses scheduled workflows on a repo with no commits for 60 days. This
 one commits most weeks, so it keeps itself alive.
@@ -119,7 +122,8 @@ recommending a chip you have already spent.
 | --- | --- |
 | `fpl_rules.py` | The game's own scoring table and squad rules, read from the API |
 | `fpl_model.py` | Team ratings, fixture model, per-player point projections |
-| `fpl_sim.py` | Monte Carlo gameweek simulation |
+| `fpl_sim.py` | Monte Carlo gameweek simulation (server side) |
+| `live_sim.js` | The same simulation, re-run live in the reader's browser |
 | `fpl_analyse.py` | Best XI, captaincy, transfer search, wildcard optimiser |
 | `fpl_dashboard.py` | HTML rendering |
 | `update.py` | Entry point — ties the three together |
