@@ -128,6 +128,61 @@ td.n,th.n{text-align:right; font-family:"IBM Plex Mono",monospace; font-variant-
   text-align:right; color:var(--ink-2)}
 .dnum b{color:var(--ink); font-size:14px}
 
+/* gameweek tabs */
+.tabs{display:flex; gap:3px; overflow-x:auto; border-bottom:2px solid var(--ink); padding-bottom:0}
+.tab{flex:0 0 auto; padding:8px 15px 7px; font-family:Archivo,system-ui,sans-serif; font-weight:700;
+  font-size:13px; border:1px solid var(--line); border-bottom:none; background:var(--panel-2);
+  color:var(--ink-2); cursor:pointer; border-radius:3px 3px 0 0; white-space:nowrap; text-align:left}
+.tab .sub{display:block; font-size:10px; font-weight:600; letter-spacing:.05em; opacity:.8;
+  font-family:"IBM Plex Mono",monospace}
+.tab[aria-selected="true"]{background:var(--ink); color:var(--bg); border-color:var(--ink)}
+.tab:focus-visible{outline:2px solid var(--teal); outline-offset:-2px}
+.panel{padding-top:16px; display:grid; grid-template-columns:1fr 300px; gap:16px; align-items:start}
+@media (max-width:820px){ .panel{grid-template-columns:1fr} }
+
+.act{border:1px solid var(--line); border-left:5px solid var(--teal); border-radius:3px;
+  background:var(--panel); padding:13px 15px; margin-bottom:12px}
+.act.bank{border-left-color:var(--ink-3)}
+.act .hd{font-family:Archivo,system-ui,sans-serif; font-weight:800; font-size:15px; margin-bottom:3px}
+.act .sm{font-size:12.5px; color:var(--ink-3)}
+.mv{display:flex; align-items:center; gap:8px; font-size:13px; padding:4px 0;
+  border-top:1px solid var(--line)}
+.mv:first-of-type{border-top:none; margin-top:7px; padding-top:8px}
+.mv .o{color:var(--ink-3); text-decoration:line-through; text-decoration-color:var(--rust)}
+.mv .g{margin-left:auto; font-family:"IBM Plex Mono",monospace; color:var(--teal); font-weight:600}
+
+.xi{border:1px solid var(--line); border-radius:3px; background:var(--panel); overflow:hidden}
+.xi .grp{display:flex; align-items:center; gap:8px; padding:5px 13px; background:var(--panel-2);
+  font-family:Archivo,system-ui,sans-serif; font-size:10px; font-weight:700; letter-spacing:.1em;
+  text-transform:uppercase; color:var(--ink-3); border-top:1px solid var(--line)}
+.xi .grp:first-child{border-top:none}
+.pl{display:grid; grid-template-columns:1fr 74px 90px 42px; gap:10px; align-items:center;
+  padding:6px 13px; border-top:1px solid var(--line); font-size:13px}
+.pl .fx{font-family:"IBM Plex Mono",monospace; font-size:11px; color:var(--ink-3)}
+.pl .pt{font-family:"IBM Plex Mono",monospace; font-size:12.5px; text-align:right; font-weight:600}
+.pl .arm{font-family:Archivo,system-ui,sans-serif; font-size:9.5px; font-weight:800;
+  border:1px solid currentColor; border-radius:2px; padding:0 4px}
+.pl .arm.c{color:var(--teal)} .pl .arm.v{color:var(--ink-3)}
+.pl.benched{opacity:.62}
+.mini{height:6px; background:var(--panel-2); border-radius:3px; overflow:hidden}
+.mini span{display:block; height:100%; background:var(--teal)}
+
+.rail{display:flex; flex-direction:column; gap:12px}
+.card{border:1px solid var(--line); border-radius:3px; background:var(--panel); padding:14px 15px}
+.card h3{font-size:11px; letter-spacing:.1em; text-transform:uppercase; color:var(--ink-3);
+  margin-bottom:9px}
+.card .big{font-family:"IBM Plex Mono",monospace; font-size:30px; font-weight:600; line-height:1;
+  font-variant-numeric:tabular-nums}
+.card .sm{font-size:12.5px; color:var(--ink-3); margin-top:4px}
+.spread{position:relative; height:20px; margin-top:11px; background:var(--panel-2); border-radius:2px}
+.spread .b{position:absolute; top:0; bottom:0; background:color-mix(in oklab,var(--teal) 34%,var(--panel-2));
+  border-radius:2px}
+.spread .m{position:absolute; top:-2px; bottom:-2px; width:2px; background:var(--ink)}
+.kv{display:flex; justify-content:space-between; gap:10px; font-size:12.5px; padding:4px 0;
+  border-top:1px solid var(--line)}
+.kv:first-of-type{border-top:none}
+.kv b{font-family:"IBM Plex Mono",monospace}
+
 /* per-player simulation grid */
 .pgrid{width:100%; border-collapse:collapse; font-size:13px}
 .pgrid th{padding:8px 8px}
@@ -236,6 +291,32 @@ button.tg:focus-visible{outline:2px solid var(--teal); outline-offset:2px}
 @media (prefers-reduced-motion:no-preference){ .hc,button.tg{transition:background .18s ease,color .18s ease} }
 """
 
+TAB_JS = """
+(function(){
+  var bar=document.querySelector('.tabs'); if(!bar) return;
+  var tabs=[].slice.call(bar.querySelectorAll('.tab'));
+  function show(i){
+    tabs.forEach(function(t,j){
+      var on=i===j;
+      t.setAttribute('aria-selected',String(on));
+      t.tabIndex=on?0:-1;
+      document.getElementById(t.getAttribute('aria-controls')).hidden=!on;
+    });
+  }
+  tabs.forEach(function(t,i){
+    t.addEventListener('click',function(){ show(i); });
+    t.addEventListener('keydown',function(e){
+      var n=null;
+      if(e.key==='ArrowRight') n=(i+1)%tabs.length;
+      else if(e.key==='ArrowLeft') n=(i-1+tabs.length)%tabs.length;
+      else if(e.key==='Home') n=0;
+      else if(e.key==='End') n=tabs.length-1;
+      if(n!==null){ e.preventDefault(); show(n); tabs[n].focus(); }
+    });
+  });
+})();
+"""
+
 JS = """
 (function(){
   var btns=document.querySelectorAll('[data-view]');
@@ -288,6 +369,76 @@ def dist_row(label, d, lo, hi, extra=""):
            x(d["median"]),
            x(d["p10"]), d["p10"], min(x(d["p90"]), 94.0), d["p90"],
            d["median"], esc(extra)))
+
+
+def week_panels(wk, gws):
+    """Tabbed gameweek-by-gameweek plan."""
+    P, A = [], None
+    out = []
+    out.append('<div class="tabs" role="tablist" aria-label="Gameweek plan">')
+    for i, w in enumerate(wk):
+        out.append(
+            '<button class="tab" role="tab" id="tb%d" aria-controls="tp%d" '
+            'aria-selected="%s" tabindex="%d" type="button">GW%d'
+            '<span class="sub">%s</span></button>'
+            % (w["gw"], w["gw"], "true" if i == 0 else "false", 0 if i == 0 else -1,
+               w["gw"], esc(w["tab_sub"])))
+    out.append("</div>")
+
+    for i, w in enumerate(wk):
+        out.append('<div class="panel" role="tabpanel" id="tp%d" aria-labelledby="tb%d"%s>'
+                   % (w["gw"], w["gw"], "" if i == 0 else " hidden"))
+        # ---- left column
+        out.append("<div>")
+        cls = "act" if w["moves"] else "act bank"
+        out.append('<div class="%s"><div class="hd">%s</div><div class="sm">%s</div>'
+                   % (cls, esc(w["action"]), w["action_sub"]))
+        for m in w["moves"]:
+            out.append('<div class="mv"><span class="o">%s</span><span>&rarr;</span>'
+                       '<span class="pname">%s</span><span class="tm">%s</span>'
+                       '<span class="g">%s</span></div>'
+                       % (esc(m["out"]), esc(m["in"]), esc(m["in_tm"]), esc(m["gain"])))
+        out.append("</div>")
+
+        out.append('<div class="xi">')
+        for grp in w["groups"]:
+            out.append('<div class="grp">%s</div>' % esc(grp["label"]))
+            for pl in grp["players"]:
+                arm = ""
+                if pl["armband"]:
+                    arm = '<span class="arm %s">%s</span>' % (
+                        "c" if pl["armband"] == "C" else "v", pl["armband"])
+                out.append(
+                    '<div class="pl%s"><span><span class="pname">%s</span>'
+                    '<span class="tm">%s</span>%s %s</span>'
+                    '<span class="fx">%s</span>'
+                    '<span class="mini"><span style="width:%.0f%%"></span></span>'
+                    '<span class="pt">%.1f</span></div>'
+                    % (" benched" if pl["benched"] else "", esc(pl["name"]), esc(pl["team"]),
+                       pl["duty"], arm, esc(pl["fix"]), pl["pct"], pl["pts"]))
+        out.append("</div></div>")
+
+        # ---- right rail
+        out.append('<div class="rail">')
+        d = w["dist"]
+        lo, hi = w["dist_lo"], w["dist_hi"]
+        span = max(hi - lo, 1.0)
+        x = lambda v: max(0.0, min(100.0, (v - lo) / span * 100.0))
+        out.append(
+            '<div class="card"><h3>Simulated GW%d</h3><div class="big">%s</div>'
+            '<div class="sm">median &middot; 80%% land between %s and %s</div>'
+            '<div class="spread"><span class="b" style="left:%.1f%%;width:%.1f%%"></span>'
+            '<span class="m" style="left:%.1f%%"></span></div></div>'
+            % (w["gw"], d["median"], d["p10"], d["p90"],
+               x(d["p10"]), x(d["p90"]) - x(d["p10"]), x(d["median"])))
+        out.append('<div class="card"><h3>Transfer balance</h3>')
+        for k, v in w["kv"]:
+            out.append('<div class="kv"><span>%s</span><b>%s</b></div>' % (esc(k), esc(v)))
+        out.append("</div>")
+        if w.get("chip"):
+            out.append('<div class="card"><h3>Chips</h3><div class="sm">%s</div></div>' % w["chip"])
+        out.append("</div></div>")
+    return "".join(out)
 
 
 def pcell(d, vmax):
@@ -445,18 +596,12 @@ def render(ctx, path):
             A('<p class="note">%s</p>' % sim["note"])
         A("</section>")
 
-    # ---- week plan
-    A('<section><div class="shead"><h2>The five-week sequence</h2>'
-      '<p>Each week&rsquo;s projected XI total, captain, and the fixture that decides it.</p></div>')
-    A('<div class="weeks">')
-    for i, w in enumerate(ctx["weeks"], 1):
-        A('<div class="week"><div class="wn"><i>WEEK %d</i><span class="eyebrow">GW%d</span></div>' % (i, w["gw"]))
-        A('<div class="cap">%s <em>captain &middot; %s</em></div>' % (esc(w["cap"]), esc(w["cap_fix"])))
-        A("<ul>")
-        for lab, val in w["rows"]:
-            A("<li><span>%s</span><b>%s</b></li>" % (esc(lab), esc(val)))
-        A("</ul></div>")
-    A("</div></section>")
+    # ---- week-by-week plan, tabbed
+    if ctx.get("week_tabs"):
+        A('<section><div class="shead"><h2>The plan, week by week</h2>'
+          '<p>%s</p></div>' % ctx["week_tabs_sub"])
+        A(week_panels(ctx["week_tabs"], gws))
+        A("</section>")
 
     # ---- per-player simulation
     ps = ctx.get("player_sim")
@@ -602,6 +747,7 @@ def render(ctx, path):
     A('<p class="note">%s</p>' % ctx["method"])
     A("</footer></div>")
     A("<script>%s</script>" % JS)
+    A("<script>%s</script>" % TAB_JS)
     if ctx.get("payload"):
         A('<script type="application/json" id="simdata">%s</script>'
           % json.dumps(ctx["payload"], separators=(",", ":")).replace("</", "<\/"))

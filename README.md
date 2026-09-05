@@ -164,6 +164,20 @@ Two things FPL does not publish stay in `fpl_rules.py` as named constants: the
 defensive-contribution thresholds (10 for defenders, 12 for everyone else) and
 the three-saves-per-point rate.
 
+### The week-by-week plan
+
+`rolling_plan()` walks forward one deadline at a time rather than optimising the
+window as a single lump. At each gameweek it spends the free transfers you will
+actually have by then, values every candidate move over **the gameweeks that
+remain** (so a transfer in the last week is correctly worth less than the same
+transfer now), and banks the transfer when nothing clears the bar. A player who
+is unavailable is always worth replacing; everything else has to beat a
+threshold.
+
+The dashboard renders that as one tab per gameweek: the transfers to make, the
+XI and bench with each player's fixture and projected points, the armband, the
+simulated spread for that week, and how the transfer balance carries forward.
+
 ### Weekly simulation
 
 `fpl_sim.py` resamples the squad 3,000 times per refresh instead of trusting a

@@ -270,3 +270,47 @@ def multi_transfer(squad, pool, gws, bank, k, shortlist=6):
         "moves": moves, "squad": cur, "bank_after": cur_bank,
         "gain": horizon_value(cur, gws) - base, "base": base,
     }
+
+
+def rolling_plan(squad, pool, gws, bank, ft, max_ft=5, spend_floor=2.5):
+    """
+    Walk forward one gameweek at a time, spending free transfers as they accrue
+    and banking them when nothing on the board is worth the move.
+
+    Each week is valued over the gameweeks that remain, not the whole window, so
+    a transfer in the last week is correctly worth less than the same transfer
+    now. Returns one entry per gameweek: the moves, the resulting XI, the
+    captain, and how the transfer balance moves.
+    """
+    cur, cur_bank, cur_ft = list(squad), bank, ft
+    out = []
+    for i, gw in enumerate(gws):
+        horizon = gws[i:]
+        moves, avail = [], cur_ft
+        while avail > 0:
+            singles, _ = single_transfers(cur, pool, horizon, cur_bank, limit=4)
+            if not singles:
+                break
+            best = singles[0]
+            # a dead asset is always worth replacing; otherwise demand a real gain
+            forced = best["out"]["avail"] <= 0.05
+            if not forced and best["gain"] < spend_floor:
+                break
+            cur = [best["in"] if p["id"] == best["out"]["id"] else p for p in cur]
+            cur_bank = round(cur_bank + best["out"]["price"] - best["in"]["price"], 1)
+            moves.append(best)
+            avail -= 1
+
+        xi, bench, base, form = best_xi(cur, gw)
+        cap = max(xi, key=lambda p: p["gws"].get(gw, 0)) if xi else None
+        vice = sorted(xi, key=lambda p: -p["gws"].get(gw, 0))[1] if len(xi) > 1 else None
+        banked = min(max_ft, avail + 1)
+        out.append({
+            "gw": gw, "moves": moves, "squad": list(cur), "bank": cur_bank,
+            "ft_before": cur_ft, "ft_used": len(moves), "ft_after": avail,
+            "ft_next": banked, "xi": xi, "bench": bench, "formation": form,
+            "captain": cap, "vice": vice,
+            "base": base, "total": base + (cap["gws"].get(gw, 0) if cap else 0),
+        })
+        cur_ft = banked
+    return out

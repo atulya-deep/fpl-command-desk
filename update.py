@@ -228,20 +228,6 @@ def main():
                        "are" if len(dead) > 1 else "is",
                        dead[0]["news"] or "unavailable"))
 
-    # ---- week cards
-    weeks = []
-    for r in rep:
-        cap = r["captain"]
-        legs = cap["fixt"].get(r["gw"]) or []
-        cf = ", ".join("%s (%s)" % (l["opp"], "H" if l["home"] else "A") for l in legs) or "blank"
-        alts = sorted(r["xi"], key=lambda p: -p["gws"][r["gw"]])[1:4]
-        weeks.append({
-            "gw": r["gw"], "cap": cap["name"], "cap_fix": cf,
-            "rows": [("Projected XI", "%.0f pts" % r["total"]),
-                     ("Formation", "%d-%d-%d" % r["formation"])] +
-                    [("Alt: " + a["name"], "%.1f" % a["gws"][r["gw"]]) for a in alts],
-        })
-
     # ---- fixture ticker
     ticker = []
     for row in A.fixture_ticker(R, fx, gws, lavg):
@@ -365,6 +351,87 @@ def main():
                sim_now["autosubs_per_run"])),
     }
 
+    # ---- tabbed week-by-week plan
+    roll = A.rolling_plan(squad, pool, gws, bank, ft)
+    roll_total = sum(w["total"] for w in roll)
+    week_sims = {}
+    for w in roll:
+        week_sims[w["gw"]] = SIM.simulate(w["squad"], [w["gw"]], boot, n=1500)["per_gw"][w["gw"]]
+    wlo = min(d["p10"] for d in week_sims.values()) - 4
+    whi = max(d["p90"] for d in week_sims.values()) + 4
+
+    chip_note = {}
+    tc_gw = max(roll, key=lambda w: w["captain"]["gws"].get(w["gw"], 0))
+    for w in roll:
+        notes = []
+        if not cfg["chips"].get("triplecap_used") and w["gw"] == tc_gw["gw"]:
+            legs = w["captain"]["fixt"].get(w["gw"]) or []
+            fixs = ", ".join("%s (%s)" % (l["opp"], "H" if l["home"] else "A") for l in legs)
+            notes.append("Best <b>Triple Captain</b> week in this window &mdash; %s against %s, "
+                         "projecting %.1f before the multiplier."
+                         % (w["captain"]["name"], fixs, w["captain"]["gws"][w["gw"]]))
+        if cfg["chips"].get("bboost_used"):
+            notes.append("Bench Boost already played in GW1.")
+        if not cfg["chips"].get("wildcard1_used"):
+            notes.append("Wildcard still held, and it lasts until GW19.")
+        chip_note[w["gw"]] = " ".join(notes)
+
+    vmax = max((p_["gws"].get(w["gw"], 0) for w in roll for p_ in w["squad"]), default=1) or 1
+    tabs = []
+    for w in roll:
+        cap_id = w["captain"]["id"] if w["captain"] else None
+        vice_id = w["vice"]["id"] if w["vice"] else None
+        groups = []
+        for et, label in ((1, "Goalkeeper"), (2, "Defenders"), (3, "Midfielders"), (4, "Forwards")):
+            members = [(p_, False) for p_ in w["xi"] if p_["et"] == et]
+            members += [(p_, True) for p_ in w["bench"] if p_["et"] == et]
+            if not members:
+                continue
+            rows_ = []
+            for p_, benched in members:
+                legs = p_["fixt"].get(w["gw"]) or []
+                fix = ", ".join("%s (%s)" % (l["opp"], "H" if l["home"] else "A")
+                                for l in legs) or "blank"
+                pts_ = p_["gws"].get(w["gw"], 0)
+                rows_.append({
+                    "name": p_["name"], "team": p_["team_short"], "fix": fix,
+                    "pts": pts_, "pct": min(100.0, pts_ / vmax * 100.0),
+                    "benched": benched, "duty": D.duty(p_),
+                    "armband": "C" if p_["id"] == cap_id else ("V" if p_["id"] == vice_id else ""),
+                })
+            groups.append({"label": label, "players": rows_})
+
+        if w["moves"]:
+            action = ("Make %d transfer%s" % (w["ft_used"], "" if w["ft_used"] == 1 else "s"))
+            asub = ("Free &mdash; you have %d banked. %d carried into GW%d."
+                    % (w["ft_before"], w["ft_next"], w["gw"] + 1)
+                    if w["gw"] < gws[-1] else
+                    "Free &mdash; you have %d banked." % w["ft_before"])
+        else:
+            action = "Bank the transfer"
+            asub = ("Nothing clears the bar this week. You go into GW%d with %d free transfer%s."
+                    % (w["gw"] + 1, w["ft_next"], "" if w["ft_next"] == 1 else "s")
+                    if w["gw"] < gws[-1] else "Nothing clears the bar this week.")
+
+        tabs.append({
+            "gw": w["gw"],
+            "tab_sub": ("%d transfer%s" % (w["ft_used"], "" if w["ft_used"] == 1 else "s"))
+                       if w["moves"] else "bank",
+            "action": action, "action_sub": asub,
+            "moves": [{"out": m["out"]["name"], "in": m["in"]["name"],
+                       "in_tm": m["in"]["team_short"], "gain": "%+.0f" % m["gain"]}
+                      for m in w["moves"]],
+            "groups": groups,
+            "dist": week_sims[w["gw"]], "dist_lo": wlo, "dist_hi": whi,
+            "kv": [("Free transfers", "%d" % w["ft_before"]),
+                   ("Used", "%d" % w["ft_used"]),
+                   ("Into GW%d" % (w["gw"] + 1), "%d" % w["ft_next"]),
+                   ("In the bank", "£%.1f" % w["bank"]),
+                   ("Captain", w["captain"]["name"] if w["captain"] else "-"),
+                   ("Formation", "%d-%d-%d" % w["formation"] if w["formation"] else "-")],
+            "chip": chip_note.get(w["gw"]),
+        })
+
     # ---- per-player simulation table
     prole = {}
     for r in rep:
@@ -452,6 +519,13 @@ def main():
         ],
         "gws": gws,
         "sim": sim_ctx,
+        "week_tabs": tabs,
+        "week_tabs_sub": (
+            "Not a single snapshot &mdash; a route. Each tab is one deadline: what to do with the "
+            "transfers you will have <em>by then</em>, who starts, who wears the armband, and what "
+            "the week is worth. Following it end to end projects <b>%.0f points</b> across "
+            "GW%d&ndash;%d against <b>%.0f</b> for standing still, and it never spends a chip."
+            % (roll_total, gws[0], gws[-1], base)),
         "player_sim": player_sim,
         "live_kpis": [
             ("liveHead", "%.0f" % sim_now["total"]["median"],
@@ -490,7 +564,6 @@ def main():
             ("Slots underperforming", "%d" % len(broken), "of 15 projecting under 16 pts"),
         ],
         "squad": sorted(squad, key=lambda p: (p["et"], -p["total"])),
-        "weeks": weeks,
         "plan": plan,
         "ticker": ticker,
         "targets": A.top_targets(pool, gws, per_pos=8),
