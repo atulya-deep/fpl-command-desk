@@ -140,10 +140,29 @@ points use a Poisson tail on each player's CBIT-plus-tackles rate against the
 10 / 12 thresholds. Save points, bonus, cards and appearance points are
 estimated from per-90 rates. Availability comes live from the official feed.
 
+### Set-piece duty
+
+The official feed publishes an explicit penalty, corner and free-kick order per
+club, and the model uses all three. Penalties are the material one: the league
+runs at roughly 0.12 per team per game converting at about 79%, so the nominated
+taker carries around 0.095 extra goals per 90, scaled by how threatening the
+side is in that particular fixture. The second name on the list gets 20% of that
+(they only take them when the first is off the pitch). Corner duty lifts assist
+rate by 12% for the first-choice taker; direct free kicks add a small goal term.
+
+The constants live at the top of `fpl_model.py` as `PEN_PER_GAME`, `PEN_CONV`,
+`PEN_SHARE`, `CK_XA_BOOST` and `FK_XG90`. Across the whole player pool this
+moves the mean projection by less than a tenth of a point — it is a targeted
+correction for the ~66 players who actually have duty, not a thumb on the scale.
+Players carrying duty are badged **PEN**, **CO** and **FK** on the dashboard.
+
 ### Known limits
 
 - Rotation is inferred from starts to date, so it lags a manager's change of mind.
 - The wildcard optimiser maximises the model's own numbers and will therefore
   overstate its edge. Read its **shape** as the recommendation, not its exact XV.
-- Set-piece and penalty duties are not modelled explicitly; they show up only
-  through realised expected goals.
+- Penalty duty is added as a flat expectation rather than stripped out of each
+  player's realised xG first, so a nominated taker who has already scored a
+  penalty this season is counted very slightly twice. The shrinkage toward the
+  price baseline absorbs most of it, and the constants below are deliberately
+  set at the conservative end.

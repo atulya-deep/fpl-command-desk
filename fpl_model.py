@@ -22,6 +22,19 @@ CS_PTS       = {1: 4, 2: 4, 3: 1, 4: 0}
 DC_THRESH    = {1: 99, 2: 10, 3: 12, 4: 12}   # defensive contribution threshold
 POS          = {1: "GK", 2: "DEF", 3: "MID", 4: "FWD"}
 
+# ---------- set-piece duty ----------
+# Premier League penalties run at roughly 0.12 per team per game and convert at
+# about 79%. The nominated taker therefore carries ~0.095 extra goals per 90
+# before adjusting for how good the team is at winning them at all.
+PEN_PER_GAME = 0.12
+PEN_CONV     = 0.79
+# The second name on the list only takes them when the first is off the pitch.
+PEN_SHARE    = {1: 1.00, 2: 0.20, 3: 0.05}
+# Corner and indirect free-kick duty lifts assist rate rather than goal rate.
+CK_XA_BOOST  = {1: 0.12, 2: 0.06}
+# Direct free kicks are a small but real goal source for the nominated taker.
+FK_XG90      = {1: 0.020, 2: 0.008}
+
 
 def fetch(name, url, refresh=True):
     os.makedirs(CACHE, exist_ok=True)
@@ -216,6 +229,14 @@ def project(boot, fixt, gw_from, gw_to):
             gshare = {1: 0.0, 2: 0.35, 3: 0.45, 4: 0.70}[et]
         xg90, xa90 = xgi90 * gshare, xgi90 * (1 - gshare)
 
+        # set-piece duty
+        pen_o = e.get("penalties_order")
+        ck_o = e.get("corners_and_indirect_freekicks_order")
+        fk_o = e.get("direct_freekicks_order")
+        pen_share = PEN_SHARE.get(pen_o, 0.0) if pen_o else 0.0
+        xa90 *= 1.0 + (CK_XA_BOOST.get(ck_o, 0.0) if ck_o else 0.0)
+        fk_xg90 = FK_XG90.get(fk_o, 0.0) if fk_o else 0.0
+
         # defensive contribution rate
         dcmed = {1: 0.0, 2: 8.0, 3: 6.0, 4: 3.0}[et]
         dc90 = (float(e["defensive_contribution"]) + dcmed * RATE_PRIOR_M / 90.0) / (mins + RATE_PRIOR_M) * 90.0
@@ -241,6 +262,13 @@ def project(boot, fixt, gw_from, gw_to):
                 pts = 2 * p60 + 1 * (p_start - p60)                 # appearance
                 pts += xg90 * mfrac * att_mult * GOAL_PTS[et]       # goals
                 pts += xa90 * mfrac * att_mult * 3                  # assists
+                # penalties and direct free kicks, scaled by how threatening the
+                # side is in this particular fixture
+                if pen_share:
+                    pts += (PEN_PER_GAME * PEN_CONV * pen_share
+                            * att_mult * mfrac * GOAL_PTS[et])
+                if fk_xg90:
+                    pts += fk_xg90 * att_mult * mfrac * GOAL_PTS[et]
                 pcs = math.exp(-xga)
                 pts += pcs * CS_PTS[et] * p60                       # clean sheet
                 if et in (1, 2):
@@ -266,6 +294,7 @@ def project(boot, fixt, gw_from, gw_to):
             "pts": e["total_points"], "mins": mins, "status": e["status"], "news": e["news"],
             "avail": avail, "p_start": p_start, "xgi90": xgi90, "dc90": dc90,
             "ep_next": float(e["ep_next"] or 0),
+            "pen_order": pen_o, "ck_order": ck_o, "fk_order": fk_o,
             "gws": gws, "fixt": details, "total": sum(gws.values()),
             "n_fix": sum(len(fx.get(tid, {}).get(g, [])) for g in range(gw_from, gw_to + 1)),
         })

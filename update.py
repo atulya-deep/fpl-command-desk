@@ -285,6 +285,8 @@ def main():
             "against in every remaining fixture, which in turn drives clean-sheet odds, attacking returns "
             "(scaled by each player&rsquo;s expected goal involvement per 90, itself shrunk toward a "
             "price-and-position baseline), defensive-contribution points, save points and bonus. "
+            "Nominated penalty, corner and free-kick takers carry an explicit uplift &mdash; badged "
+            "<b>PEN</b>, <b>CO</b> and <b>FK</b> below. "
             "Availability is taken live from the official feed. Re-run <code>py update.py</code> after each "
             "deadline and this page rewrites itself." % max(R[1]["gp"], 1)),
     }

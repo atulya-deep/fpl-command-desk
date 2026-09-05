@@ -84,6 +84,12 @@ td.n,th.n{text-align:right; font-family:"IBM Plex Mono",monospace; font-variant-
 .pos{display:inline-block; min-width:34px; text-align:center; font-family:Archivo,system-ui,sans-serif;
   font-size:10px; font-weight:700; letter-spacing:.06em; padding:2px 5px; border-radius:2px;
   background:var(--chip); color:var(--ink-2)}
+/* set-piece duty */
+.sp{display:inline-block; font-family:Archivo,system-ui,sans-serif; font-size:9px; font-weight:800;
+  letter-spacing:.07em; padding:1px 4px; border-radius:2px; margin-left:4px; vertical-align:1px;
+  border:1px solid currentColor}
+.sp.pen{color:var(--violet)}
+.sp.set{color:var(--ink-3)}
 
 /* inline projection bar */
 .bar{position:relative; height:16px; min-width:104px; background:var(--panel-2); border-radius:2px; overflow:hidden}
@@ -183,6 +189,19 @@ def cell(opp_txt, sub, att, dfn):
             % (c, att, dfn, t, esc(opp_txt), esc(sub)))
 
 
+def duty(p):
+    """Set-piece duty badges: penalties first, then corners / free kicks."""
+    out = []
+    if p.get("pen_order") in (1, 2):
+        out.append('<span class="sp pen" title="Penalty taker, order %d">PEN%s</span>'
+                   % (p["pen_order"], "" if p["pen_order"] == 1 else "2"))
+    if p.get("ck_order") == 1:
+        out.append('<span class="sp set" title="First-choice corners">CO</span>')
+    if p.get("fk_order") == 1:
+        out.append('<span class="sp set" title="First-choice direct free kicks">FK</span>')
+    return "".join(out)
+
+
 def bar(val, vmax, label=None):
     pct = 0 if vmax <= 0 else max(3.0, min(100.0, val / vmax * 100.0))
     return ('<div class="bar"><span style="width:%.1f%%"></span><b>%s</b></div>'
@@ -250,7 +269,8 @@ def render(ctx, path):
     smax = max((p["total"] for p in ctx["squad"]), default=1)
     for p in ctx["squad"]:
         A("<tr>")
-        A('<td><span class="pname">%s</span><span class="tm">%s</span></td>' % (esc(p["name"]), esc(p["team_short"])))
+        A('<td><span class="pname">%s</span><span class="tm">%s</span>%s</td>'
+          % (esc(p["name"]), esc(p["team_short"]), duty(p)))
         A('<td><span class="pos">%s</span></td><td class="n">%.1f</td>' % (esc(p["pos"]), p["price"]))
         for g in gws:
             f = p["fixt"].get(g) or []
@@ -317,9 +337,9 @@ def render(ctx, path):
           '<th class="n">Own</th></tr></thead><tbody>' % esc(pos))
         for p in rows:
             own = '<td class="n">%.0f%%</td>' % p["sel"]
-            A('<tr><td><span class="pname">%s</span><span class="tm">%s</span></td>'
+            A('<tr><td><span class="pname">%s</span><span class="tm">%s</span>%s</td>'
               '<td class="n">%.1f</td><td class="n">%.1f</td>%s</tr>'
-              % (esc(p["name"]), esc(p["team_short"]), p["price"], p["total"], own))
+              % (esc(p["name"]), esc(p["team_short"]), duty(p), p["price"], p["total"], own))
         A("</tbody></table></div>")
     A("</div></section>")
 
@@ -329,9 +349,9 @@ def render(ctx, path):
     A('<div class="tw"><table><thead><tr><th>Player</th><th class="n">&pound;</th><th class="n">5GW</th>'
       '<th class="n">Own</th></tr></thead><tbody>')
     for p in ctx["diffs"]:
-        A('<tr><td><span class="pname">%s</span><span class="tm">%s</span> <span class="pos">%s</span></td>'
+        A('<tr><td><span class="pname">%s</span><span class="tm">%s</span> <span class="pos">%s</span>%s</td>'
           '<td class="n">%.1f</td><td class="n">%.1f</td><td class="n">%.1f%%</td></tr>'
-          % (esc(p["name"]), esc(p["team_short"]), esc(p["pos"]), p["price"], p["total"], p["sel"]))
+          % (esc(p["name"]), esc(p["team_short"]), esc(p["pos"]), duty(p), p["price"], p["total"], p["sel"]))
     A("</tbody></table></div></section>")
 
     A('<section><div class="shead"><h2>Availability watchlist</h2><p>Live from the FPL feed.</p></div>')
