@@ -22,31 +22,40 @@ settled.
 | `py update.py --offline` | Re-render from the last download (no network) |
 | `py update.py --gw 7` | Force a starting gameweek |
 
-## The weekly run
+## The weekly run happens in the cloud
 
-A Windows scheduled task named **FPL Weekly Refresh** is already registered and
-runs every Wednesday at 09:00. It calls `refresh.cmd /quiet`, which updates the
-data and rewrites `dashboard.html` without opening a browser window.
-
-```powershell
-schtasks /query  /tn "FPL Weekly Refresh" /fo LIST   # check it
-schtasks /run    /tn "FPL Weekly Refresh"            # run it now
-schtasks /delete /tn "FPL Weekly Refresh" /f         # remove it
-```
-
-To recreate it from scratch (PowerShell — note the path is quoted as a single
-argument, with no backslash escaping):
+`.github/workflows/refresh.yml` runs on GitHub's servers every **Wednesday at
+08:00 UTC**. It rebuilds the dashboard from live FPL data, commits it, and
+pushes — which makes Pages redeploy. Nothing on your machine needs to be
+switched on.
 
 ```powershell
-schtasks /create /tn "FPL Weekly Refresh" /tr "C:\Users\Abcom\Downloads\FPL\refresh.cmd /quiet" /sc weekly /d WED /st 09:00 /f
+gh workflow run refresh.yml            # trigger a run right now
+gh run list --workflow refresh.yml     # see recent runs
+gh run view <run-id> --log             # read a run's output
 ```
 
-If the machine is asleep at 09:00 the task is skipped rather than queued; just
-double-click `refresh.cmd` when you next sit down.
+You can also hit **Run workflow** on the Actions tab. To change the cadence,
+edit the `cron` line — it is always UTC, never local time:
 
-After each refresh, `refresh.cmd` calls `publish.cmd`, which commits and pushes
-the rebuilt page. Until an `origin` remote exists it skips that step quietly, so
-the weekly task works whether or not GitHub is set up.
+| Cron | Meaning |
+| --- | --- |
+| `0 8 * * 3` | Wednesdays 08:00 UTC (current) |
+| `0 8 * * 2,5` | Tuesdays and Fridays — catches late injury news before a deadline |
+| `0 8 * * *` | Daily |
+
+GitHub pauses scheduled workflows on a repo with no commits for 60 days. This
+one commits most weeks, so it keeps itself alive.
+
+### Running it by hand
+
+`refresh.cmd` still works for an on-demand rebuild. It calls `publish.cmd`,
+which rebases onto the remote before pushing, so a manual run cannot collide
+with a commit the scheduled workflow already made.
+
+There is deliberately **no Windows scheduled task** any more — two things
+pushing to the same branch is a conflict waiting to happen, and the cloud run
+does not depend on your laptop being awake.
 
 ## Put it on GitHub Pages
 
