@@ -14,11 +14,14 @@ if hasattr(sys.stdout, "buffer"):
 import fpl_model as M
 import fpl_analyse as A
 import fpl_dashboard as D
+import fpl_sim as SIM
+import fpl_rules as RULES
 
 HERE = os.path.dirname(os.path.abspath(__file__))
 CFG = os.path.join(HERE, "config.json")
 HIST = os.path.join(HERE, "history")
 HORIZON = 5
+SIM_RUNS = 3000
 
 
 def load_cfg():
@@ -173,7 +176,7 @@ def main():
                 cells.append({
                     "legs": len(c),
                     "opp": "/".join(x["opp"] for x in c),
-                    "sub": "%s &middot; %.1f" % ("".join("H" if x["home"] else "A" for x in c), xgf),
+                    "sub": "%s · %.1f" % ("".join("H" if x["home"] else "A" for x in c), xgf),
                     "att": max(-1.0, min(1.0, (xgf - lavg) / 1.15)),
                     "def": max(-1.0, min(1.0, (lavg - xga) / 1.05)),
                 })
@@ -250,6 +253,41 @@ def main():
 
     delta = "" if prev_val is None else " (%+.0f vs last run)" % (base - prev_val)
 
+    # ---- Monte Carlo: the squad as it stands vs the recommended squad
+    print("Simulating %d seasons ..." % SIM_RUNS)
+    plan_squad = wc if mode == "wildcard" else (
+        dbl["squad"] if mode == "double" and dbl else
+        [singles[0]["in"] if p["id"] == singles[0]["out"]["id"] else p for p in squad]
+        if singles else squad)
+    sim_now = SIM.simulate(squad, gws, boot, n=SIM_RUNS)
+    sim_plan = SIM.simulate(plan_squad, gws, boot, n=SIM_RUNS, seed=7)
+    p_better = SIM.beat_probability(sim_plan["samples"], sim_now["samples"])
+
+    lo = min(sim_now["per_gw"][g]["p10"] for g in gws) - 4
+    hi = max(sim_plan["per_gw"][g]["p90"] for g in gws) + 4
+    rows = []
+    for g in gws:
+        d = sim_now["per_gw"][g]
+        rows.append({"label": "GW%d" % g, "d": d,
+                     "extra": " ±%.0f" % d["sd"]})
+    sim_ctx = {
+        "title": "Weekly simulation",
+        "sub": "%s runs of the full squad under the real rules &mdash; shared clean sheets, "
+               "auto-substitutions and the vice-captain taking over." % "{:,}".format(SIM_RUNS),
+        "rows": rows, "lo": lo, "hi": hi,
+        "note": (
+            "Across five gameweeks the current squad lands between <b>%.0f and %.0f points</b> "
+            "eight times out of ten, with a median of <b>%.0f</b>. The recommended squad "
+            "medians <b>%.0f</b> and outscores the current one in <b>%.0f%%</b> of paired runs. "
+            "The captain returns six or more in %.0f&ndash;%.0f%% of weeks. Auto-substitutions "
+            "rescue %.1f blanks per five gameweeks, which is why the bench still matters."
+            % (sim_now["total"]["p10"], sim_now["total"]["p90"], sim_now["total"]["median"],
+               sim_plan["total"]["median"], p_better * 100,
+               min(sim_now["captain_return_rate"].values()) * 100,
+               max(sim_now["captain_return_rate"].values()) * 100,
+               sim_now["autosubs_per_run"])),
+    }
+
     dl = next((e["deadline_time"] for e in boot["events"] if e["id"] == gws[0]), "")
     dl_txt = dl.replace("T", " ")[:16] + " UTC" if dl else "-"
 
@@ -264,10 +302,13 @@ def main():
             ("Updated", datetime.datetime.now().strftime("%d %b %Y, %H:%M")),
         ],
         "gws": gws,
+        "sim": sim_ctx,
         "verdict": {"call": call, "body": body},
         "kpis": [
-            ("Projected GW%d-%d" % (gws[0], gws[-1]), "%.0f" % base, "points as the squad stands%s" % delta),
-            ("Per gameweek", "%.0f" % (base / len(gws)), "average across the window"),
+            ("Simulated GW%d-%d" % (gws[0], gws[-1]), "%.0f" % sim_now["total"]["median"],
+             "median of %s runs%s" % ("{:,}".format(SIM_RUNS), delta)),
+            ("Realistic range", "%.0f-%.0f" % (sim_now["total"]["p10"], sim_now["total"]["p90"]),
+             "80%% of simulated outcomes"),
             ("Wildcard ceiling", "%.0f" % wcval, "%+.0f if fully rebuilt" % wc_gain),
             ("Slots underperforming", "%d" % len(broken), "of 15 projecting under 16 pts"),
         ],

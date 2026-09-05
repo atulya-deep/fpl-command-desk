@@ -106,6 +106,28 @@ td.n,th.n{text-align:right; font-family:"IBM Plex Mono",monospace; font-variant-
 .grid td{padding:3px}
 .grid th.gw{text-align:center}
 
+/* simulation distribution */
+.dist{display:flex; flex-direction:column; gap:1px; background:var(--line); border:1px solid var(--line);
+  border-radius:3px; overflow:hidden}
+.drow{background:var(--panel); display:grid; grid-template-columns:54px 1fr 122px; gap:14px;
+  align-items:center; padding:11px 15px}
+.drow.head{background:var(--panel-2)}
+.drow.head span{font-family:Archivo,system-ui,sans-serif; font-size:10.5px; letter-spacing:.09em;
+  text-transform:uppercase; color:var(--ink-3)}
+.gwlab{font-family:Archivo,system-ui,sans-serif; font-weight:800; font-size:13px}
+.track{position:relative; height:24px}
+.track .axis{position:absolute; left:0; right:0; top:50%; height:1px; background:var(--line)}
+.track .band{position:absolute; top:5px; height:14px; border-radius:2px;
+  background:color-mix(in oklab, var(--teal) 20%, var(--panel))}
+.track .iqr{position:absolute; top:5px; height:14px; border-radius:2px;
+  background:color-mix(in oklab, var(--teal) 46%, var(--panel))}
+.track .med{position:absolute; top:2px; width:2px; height:20px; background:var(--ink); border-radius:1px}
+.track .cap{position:absolute; top:-1px; font-size:9.5px; color:var(--ink-3);
+  font-family:"IBM Plex Mono",monospace}
+.dnum{font-family:"IBM Plex Mono",monospace; font-variant-numeric:tabular-nums; font-size:12.5px;
+  text-align:right; color:var(--ink-2)}
+.dnum b{color:var(--ink); font-size:14px}
+
 /* legend */
 .legend{display:flex; align-items:center; gap:9px; font-size:12px; color:var(--ink-3); flex-wrap:wrap}
 .ramp{display:flex; height:11px; border-radius:2px; overflow:hidden; width:150px; border:1px solid var(--line)}
@@ -189,6 +211,28 @@ def cell(opp_txt, sub, att, dfn):
             % (c, att, dfn, t, esc(opp_txt), esc(sub)))
 
 
+def dist_row(label, d, lo, hi, extra=""):
+    """One p10-p90 range bar with an interquartile block and a median tick."""
+    span = max(hi - lo, 1.0)
+    def x(v):
+        return max(0.0, min(100.0, (v - lo) / span * 100.0))
+    return (
+        '<div class="drow"><span class="gwlab">%s</span>'
+        '<div class="track"><span class="axis"></span>'
+        '<span class="band" style="left:%.1f%%;width:%.1f%%"></span>'
+        '<span class="iqr" style="left:%.1f%%;width:%.1f%%"></span>'
+        '<span class="med" style="left:%.1f%%"></span>'
+        '<span class="cap" style="left:%.1f%%">%s</span>'
+        '<span class="cap" style="left:%.1f%%">%s</span></div>'
+        '<span class="dnum"><b>%s</b>%s</span></div>'
+        % (esc(label),
+           x(d["p10"]), x(d["p90"]) - x(d["p10"]),
+           x(d["p25"]), x(d["p75"]) - x(d["p25"]),
+           x(d["median"]),
+           x(d["p10"]), d["p10"], min(x(d["p90"]), 94.0), d["p90"],
+           d["median"], esc(extra)))
+
+
 def duty(p):
     """Set-piece duty badges: penalties first, then corners / free kicks."""
     out = []
@@ -246,6 +290,19 @@ def render(ctx, path):
           '<span class="s">%s</span></div>' % (esc(k[0]), esc(k[1]), esc(k[2])))
     A("</div>")
 
+    # ---- simulation
+    sim = ctx.get("sim")
+    if sim:
+        A('<section><div class="shead"><h2>%s</h2><p>%s</p></div>' % (esc(sim["title"]), sim["sub"]))
+        A('<div class="dist"><div class="drow head"><span>Week</span>'
+          '<span>10th percentile &rarr; 90th percentile &middot; box is the middle half</span>'
+          '<span style="text-align:right">Median</span></div>')
+        for r in sim["rows"]:
+            A(dist_row(r["label"], r["d"], sim["lo"], sim["hi"], r["extra"]))
+        A("</div>")
+        A('<p class="note">%s</p>' % sim["note"])
+        A("</section>")
+
     # ---- week plan
     A('<section><div class="shead"><h2>The five-week sequence</h2>'
       '<p>Each week&rsquo;s projected XI total, captain, and the fixture that decides it.</p></div>')
@@ -279,7 +336,7 @@ def render(ctx, path):
             else:
                 opp = "/".join(x["opp"] for x in f)
                 ha = "".join("H" if x["home"] else "A" for x in f)
-                A('<td class="grid">%s</td>' % cell(opp, "%s &middot; %.1f" % (ha, p["gws"][g]),
+                A('<td class="grid">%s</td>' % cell(opp, "%s · %.1f" % (ha, p["gws"][g]),
                                                     p["heat"][g][0], p["heat"][g][1]))
         A("<td>%s</td>" % bar(p["total"], smax))
         A("<td>%s</td>" % p["status_html"])

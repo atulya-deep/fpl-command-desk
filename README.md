@@ -117,7 +117,9 @@ recommending a chip you have already spent.
 
 | File | Role |
 | --- | --- |
+| `fpl_rules.py` | The game's own scoring table and squad rules, read from the API |
 | `fpl_model.py` | Team ratings, fixture model, per-player point projections |
+| `fpl_sim.py` | Monte Carlo gameweek simulation |
 | `fpl_analyse.py` | Best XI, captaincy, transfer search, wildcard optimiser |
 | `fpl_dashboard.py` | HTML rendering |
 | `update.py` | Entry point — ties the three together |
@@ -139,6 +141,38 @@ attacking returns are scaled by each player's expected goal involvement per 90
 points use a Poisson tail on each player's CBIT-plus-tackles rate against the
 10 / 12 thresholds. Save points, bonus, cards and appearance points are
 estimated from per-90 rates. Availability comes live from the official feed.
+
+### Rules
+
+Nothing about scoring is hardcoded. FPL publishes its whole scoring table and
+squad rules in `bootstrap-static` under `game_config`, and `fpl_rules.py` reads
+them on every run: goals by position (keeper 10, defender 6, midfielder 5,
+forward 4), clean sheets, goals conceded, assists, saves, penalties saved and
+missed, yellow and red cards, own goals, bonus and defensive contribution. Squad
+size, the £100.0m budget, the three-per-club cap, the legal formations and the
+five-free-transfer ceiling come from the same place. A mid-season rule change
+flows through on the next refresh rather than rotting in a constant.
+
+Two things FPL does not publish stay in `fpl_rules.py` as named constants: the
+defensive-contribution thresholds (10 for defenders, 12 for everyone else) and
+the three-saves-per-point rate.
+
+### Weekly simulation
+
+`fpl_sim.py` resamples the squad 3,000 times per refresh instead of trusting a
+single expected value. Each run draws goals and assists from Poisson
+distributions, and — importantly — draws **one shared conceded total per club
+per fixture**, so team-mates' clean sheets rise and fall together. Three players
+from the same defence is a correlated bet, and the spread reflects that.
+
+It then applies the rules a point estimate cannot: **auto-substitutions** (a
+starter on zero minutes is replaced by the first bench player who featured,
+provided the XI stays legal, keepers only for keepers) and the **vice-captain**
+inheriting the armband when the captain does not appear.
+
+The output is a median with a 10th-to-90th-percentile range per gameweek, the
+captain's return rate, and the probability that the recommended squad outscores
+the current one across paired runs.
 
 ### Set-piece duty
 

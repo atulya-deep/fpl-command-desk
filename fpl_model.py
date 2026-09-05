@@ -8,6 +8,8 @@ gameweek.
 """
 import json, math, os, sys, urllib.request
 
+import fpl_rules as RULES
+
 API = "https://fantasy.premierleague.com/api"
 HDRS = {"User-Agent": "Mozilla/5.0"}
 CACHE = os.path.join(os.path.dirname(os.path.abspath(__file__)), "data")
@@ -17,10 +19,7 @@ PRIOR_K      = 5.0    # games of prior weight applied to team ratings
 PRIOR_SPREAD = 0.28   # how far market value moves a team rating
 HFA          = 1.12   # home advantage multiplier
 RATE_PRIOR_M = 200.0  # minutes of prior weight on player rate stats
-GOAL_PTS     = {1: 10, 2: 6, 3: 5, 4: 4}
-CS_PTS       = {1: 4, 2: 4, 3: 1, 4: 0}
-DC_THRESH    = {1: 99, 2: 10, 3: 12, 4: 12}   # defensive contribution threshold
-POS          = {1: "GK", 2: "DEF", 3: "MID", 4: "FWD"}
+POS          = RULES.POS   # scoring itself now comes from RULES.scoring(boot)
 
 # ---------- set-piece duty ----------
 # Premier League penalties run at roughly 0.12 per team per game and convert at
@@ -34,6 +33,12 @@ PEN_SHARE    = {1: 1.00, 2: 0.20, 3: 0.05}
 CK_XA_BOOST  = {1: 0.12, 2: 0.06}
 # Direct free kicks are a small but real goal source for the nominated taker.
 FK_XG90      = {1: 0.020, 2: 0.008}
+# Keepers save roughly a fifth of the penalties they face.
+PEN_SAVE_RATE = 0.21
+# Pseudo-count, in xGI, pulling a player's goal/assist split toward positional norm.
+GSHARE_PRIOR = 1.5
+# Ceiling on start probability for a player who has started every game so far.
+NAILED_CAP = 0.96
 
 
 def fetch(name, url, refresh=True):
@@ -194,6 +199,9 @@ def price_baseline(boot):
 
 
 def project(boot, fixt, gw_from, gw_to):
+    SC = RULES.scoring(boot)
+    GOAL, CS, CONC = SC["goals"], SC["clean_sheet"], SC["conceded"]
+    DCP, DCT = SC["dc"], SC["dc_threshold"]
     R, lavg = team_ratings(boot, fixt)
     fx = upcoming(fixt, gw_from, gw_to)
     base = price_baseline(boot)
@@ -214,7 +222,9 @@ def project(boot, fixt, gw_from, gw_to):
         elif e["status"] == "d":
             avail = min(avail, 0.75 if cop is None else cop / 100.0)
 
-        p_start = min(e["starts"] / tg, 1.0) * avail
+        # Even an ever-present is not certain to feature: a knock in the warm-up
+        # or an unannounced rotation still happens.
+        p_start = min(e["starts"] / tg, 1.0) * avail * NAILED_CAP
         exp_min = (min(mins / tg, 90.0) * avail) if mins else 0.0
         p60 = p_start * 0.88
 
@@ -223,10 +233,10 @@ def project(boot, fixt, gw_from, gw_to):
         xgi = float(e["expected_goal_involvements"])
         xgi90 = (xgi + pri * RATE_PRIOR_M / 90.0) / (mins + RATE_PRIOR_M) * 90.0
         xg, xa = float(e["expected_goals"]), float(e["expected_assists"])
-        if (xg + xa) > 0.3:
-            gshare = xg / (xg + xa)
-        else:
-            gshare = {1: 0.0, 2: 0.35, 3: 0.45, 4: 0.70}[et]
+        gdef = {1: 0.0, 2: 0.35, 3: 0.45, 4: 0.70}[et]
+        # Shrink the goal/assist split as well as the rate - two games of xG is
+        # nowhere near enough to claim a player is 91% goals.
+        gshare = (xg + gdef * GSHARE_PRIOR) / (xg + xa + GSHARE_PRIOR)
         xg90, xa90 = xgi90 * gshare, xgi90 * (1 - gshare)
 
         # set-piece duty
@@ -244,6 +254,10 @@ def project(boot, fixt, gw_from, gw_to):
         bonus90 = (e["bonus"] + 0.12 * RATE_PRIOR_M / 90.0) / (mins + RATE_PRIOR_M) * 90.0
         saves90 = float(e["saves_per_90"]) if (et == 1 and mins) else 0.0
         yc90 = (e["yellow_cards"] / mins * 90.0) if mins else 0.15
+        rc90 = (e["red_cards"] + 0.012 * RATE_PRIOR_M / 90.0) / (mins + RATE_PRIOR_M) * 90.0
+        og90 = (e["own_goals"] + 0.008 * RATE_PRIOR_M / 90.0) / (mins + RATE_PRIOR_M) * 90.0
+        # penalties a keeper faces per 90, scaled later by the fixture
+        pen_faced90 = PEN_PER_GAME if et == 1 else 0.0
 
         gws, details = {}, {}
         for gw in range(gw_from, gw_to + 1):
@@ -255,34 +269,57 @@ def project(boot, fixt, gw_from, gw_to):
                     xgf, xga = fixture_xg(R, lavg, tid, leg["opp"])
                 else:
                     xga, xgf = fixture_xg(R, lavg, leg["opp"], tid)
-                ref = R[tid]["xg_pg"] if R[tid]["gp"] else lavg
+                # Compare like with like: what the model expects this side to
+                # create against an average opponent, not their observed mean.
+                ref = lavg * R[tid]["att"]
                 att_mult = min(max(xgf / max(ref, 0.4), 0.55), 1.8)
                 mfrac = exp_min / 90.0
 
-                pts = 2 * p60 + 1 * (p_start - p60)                 # appearance
-                pts += xg90 * mfrac * att_mult * GOAL_PTS[et]       # goals
-                pts += xa90 * mfrac * att_mult * 3                  # assists
+                pts = (SC["appearance_long"] * p60
+                       + SC["appearance_short"] * (p_start - p60))   # appearance
+                pts += xg90 * mfrac * att_mult * GOAL[et]            # goals
+                pts += xa90 * mfrac * att_mult * SC["assist"]        # assists
                 # penalties and direct free kicks, scaled by how threatening the
                 # side is in this particular fixture
                 if pen_share:
-                    pts += (PEN_PER_GAME * PEN_CONV * pen_share
-                            * att_mult * mfrac * GOAL_PTS[et])
+                    pens = PEN_PER_GAME * pen_share * att_mult * mfrac
+                    pts += pens * PEN_CONV * GOAL[et]
+                    pts += pens * (1 - PEN_CONV) * SC["pen_missed"]  # misses
                 if fk_xg90:
-                    pts += fk_xg90 * att_mult * mfrac * GOAL_PTS[et]
+                    pts += fk_xg90 * att_mult * mfrac * GOAL[et]
                 pcs = math.exp(-xga)
-                pts += pcs * CS_PTS[et] * p60                       # clean sheet
-                if et in (1, 2):
-                    pts -= (xga / 2.0) * mfrac * 0.75               # goals conceded
-                if et == 1:
-                    pts += (saves90 * (xga / max(R[tid]["xga_pg"] or lavg, 0.4)) * mfrac) / 3.0
-                if et != 1:
-                    pts += 2.0 * pois_ge(dc90 * mfrac, DC_THRESH[et]) * avail
-                pts += bonus90 * mfrac
-                pts -= yc90 * mfrac * 0.9
+                pts += pcs * CS[et] * p60                           # clean sheet
+                if CONC[et]:                                        # goals conceded
+                    pts += (CONC[et] * (xga / SC["conceded_per_point"])
+                            * mfrac * 0.75)
+                if et == 1:                                         # keeper only
+                    load = xga / max(lavg * R[tid]["def"], 0.4)
+                    pts += (saves90 * load * mfrac) * SC["save"] / SC["saves_per_point"]
+                    pts += pen_faced90 * PEN_SAVE_RATE * mfrac * SC["pen_saved"]
+                if DCP[et]:                                         # defensive contribution
+                    pts += DCP[et] * pois_ge(dc90 * mfrac, DCT[et]) * avail
+                pts += bonus90 * mfrac * SC["bonus"]
+                pts += yc90 * mfrac * SC["yellow"] * 0.9
+                pts += rc90 * mfrac * SC["red"]
+                pts += og90 * mfrac * SC["own_goal"]
                 tot += max(pts, 0.0)
                 leg_info.append({
                     "opp": R[leg["opp"]]["short"], "home": leg["home"],
                     "xgf": round(xgf, 2), "xga": round(xga, 2), "cs": round(pcs, 3),
+                    # parameters the Monte Carlo needs to resample this fixture
+                    "sim": {
+                        "team": tid, "xga": xga,
+                        "lam_g": xg90 * mfrac * att_mult
+                                 + (PEN_PER_GAME * pen_share * att_mult * mfrac * PEN_CONV
+                                    if pen_share else 0.0)
+                                 + fk_xg90 * att_mult * mfrac,
+                        "lam_a": xa90 * mfrac * att_mult,
+                        "p_dc": pois_ge(dc90 * mfrac, DCT[et]) * avail,
+                        "saves_mu": (saves90 * (xga / max(lavg * R[tid]["def"], 0.4))
+                                     * mfrac) if et == 1 else 0.0,
+                        "bonus_mu": bonus90 * mfrac,
+                        "yc": yc90 * mfrac, "rc": rc90 * mfrac,
+                    },
                 })
             gws[gw] = tot
             details[gw] = leg_info
