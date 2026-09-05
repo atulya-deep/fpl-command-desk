@@ -15,7 +15,7 @@
   var BUDGET = 100.0, CLUB_CAP = 3;
 
   var state = load() || null;
-  var captains = {}, runs = 3000;
+  var captains = {}, vices = {}, runs = 3000;
 
   function load() {
     try {
@@ -290,9 +290,41 @@
   window.FPLDesk = { get squad() { return state ? state.squad : []; }, simulate: simulate, P: P };
 
   // -------------------------------------------------------------- rendering
+  function armbands(w) {
+    // a captain or vice chosen on the pitch overrides the planner's pick
+    if (captains[w.gw] && w.xi.indexOf(captains[w.gw]) >= 0) w.cap = captains[w.gw];
+    if (vices[w.gw] && w.xi.indexOf(vices[w.gw]) >= 0 && vices[w.gw] !== w.cap) w.vice = vices[w.gw];
+    else if (w.vice === w.cap || w.xi.indexOf(w.vice) < 0) {
+      w.vice = w.xi.filter(function (x) { return x !== w.cap; })
+                   .sort(function (a, b) { return ep(b, w.gw) - ep(a, w.gw); })[0];
+    }
+    w.total = w.xi.reduce(function (t, id) { return t + ep(id, w.gw); }, 0) + (w.cap ? ep(w.cap, w.gw) : 0);
+  }
+
+  function pitchHTML(w) {
+    var base = {}; state.squad.forEach(function (i) { base[i] = 1; });
+    function chip(id) {
+      var arm = id === w.cap ? '<span class="arm">C</span>' : (id === w.vice ? '<span class="arm v">V</span>' : "");
+      var nw = base[id] ? "" : '<span class="new">IN</span>';
+      return '<button class="chip" type="button" data-id="' + id + '" data-gw="' + w.gw +
+        '" aria-label="' + esc(P[id].n) + '">' + nw + arm + '<span class="nm">' + esc(P[id].n) +
+        '</span><span class="fx">' + esc(fixOf(id, w.gw)) + '</span><span class="pt">' +
+        ep(id, w.gw).toFixed(1) + "</span></button>";
+    }
+    var lines = [1, 2, 3, 4].map(function (et) {
+      return '<div class="pline">' + w.xi.filter(function (id) { return P[id].et === et; })
+        .map(chip).join("") + "</div>";
+    }).join("");
+    var bench = '<div class="pbench"><span class="lbl">BENCH</span>' + w.bench.map(chip).join("") + "</div>";
+    return '<div class="pitch">' + lines + bench + '</div><div class="actHost" data-gw="' + w.gw + '"></div>';
+  }
+
   function renderWeeks(plan) {
     var host = $("#weekHost");
     if (!host) return;
+    plan.forEach(armbands);
+    var prev = host.querySelector('[role="tab"][aria-selected="true"]');
+    var keepGw = prev ? +prev.id.replace("tb", "") : null;
     var vmax = 1;
     plan.forEach(function (w) {
       w.squad.forEach(function (id) { vmax = Math.max(vmax, ep(id, w.gw)); });
@@ -321,6 +353,7 @@
       });
       o.push("</div>");
 
+      o.push(pitchHTML(w));
       o.push('<div class="xi">');
       [[1, "Goalkeeper"], [2, "Defenders"], [3, "Midfielders"], [4, "Forwards"]].forEach(function (g) {
         var members = w.xi.filter(function (id) { return P[id].et === g[0]; })
@@ -361,6 +394,85 @@
     });
     host.innerHTML = tabs.join("");
     wireTabs(host);
+    if (keepGw !== null) { var kt = host.querySelector("#tb" + keepGw); if (kt) kt.click(); }
+    wirePitch(host, plan);
+  }
+
+  // ---------------------------------------------------------- pitch actions
+  function wirePitch(host, plan) {
+    host.querySelectorAll(".chip").forEach(function (ch) {
+      ch.addEventListener("click", function () {
+        host.querySelectorAll(".chip.sel").forEach(function (x) { x.classList.remove("sel"); });
+        ch.classList.add("sel");
+        showActions(host, plan, +ch.dataset.gw, +ch.dataset.id);
+      });
+    });
+  }
+
+  function showActions(host, plan, gw, id) {
+    var w = plan.filter(function (x) { return x.gw === gw; })[0];
+    var ah = host.querySelector('.actHost[data-gw="' + gw + '"]');
+    if (!w || !ah) return;
+    var inBase = state.squad.indexOf(id) >= 0, inXI = w.xi.indexOf(id) >= 0;
+    var last = GWS[GWS.length - 1];
+    var o = ['<div class="actp"><div class="who"><b>' + esc(P[id].n) + '</b><span class="tm">' +
+      esc(P[id].t) + '</span><span class="pos">' + P[id].pos + '</span><span class="fx">' +
+      esc(fixOf(id, gw)) + " &middot; " + ep(id, gw).toFixed(1) + " pts &middot; &pound;" +
+      P[id].pr.toFixed(1) + "</span></div>"];
+    o.push('<div class="btns">');
+    if (inXI) {
+      o.push('<button class="tg" type="button" data-act="cap">Captain for GW' + gw + "</button>");
+      o.push('<button class="tg" type="button" data-act="vice">Vice for GW' + gw + "</button>");
+    }
+    o.push('<button class="tg" type="button" data-act="close">Close</button></div>');
+
+    if (inBase) {
+      var budget = P[id].pr + state.bank, counts = clubCounts(state.squad), own = {};
+      state.squad.forEach(function (i) { own[i] = 1; });
+      var rest = GWS.slice(GWS.indexOf(gw)), baseV = horizon(state.squad, rest);
+      var alts = BYPOS[P[id].et].filter(function (c) {
+        if (own[c] || P[c].pr > budget + 1e-9) return false;
+        if (P[c].t !== P[id].t && (counts[P[c].t] || 0) >= CLUB_CAP) return false;
+        return true;
+      }).slice(0, 40).map(function (c) {
+        var trial = state.squad.map(function (x) { return x === id ? c : x; });
+        return { id: c, gain: horizon(trial, rest) - baseV };
+      }).sort(function (a, b) { return b.gain - a.gain; }).slice(0, 24);
+      o.push('<div style="font-size:12px;color:var(--ink-3)">Swap for &mdash; gain over GW' + gw +
+        "&ndash;" + last + ", within &pound;" + budget.toFixed(1) + "</div>");
+      o.push('<div class="alts">' + alts.map(function (a) {
+        return '<button class="alt" type="button" data-act="swap" data-in="' + a.id + '"><span class="pname">' +
+          esc(P[a.id].n) + '</span><span class="tm">' + esc(P[a.id].t) + '</span><span class="p">&pound;' +
+          P[a.id].pr.toFixed(1) + '</span><span class="d">' + (a.gain >= 0 ? "+" : "") + a.gain.toFixed(0) +
+          "</span></button>";
+      }).join("") + "</div>");
+    } else {
+      o.push('<div style="font-size:12px;color:var(--ink-3)">Brought in by a planned transfer. Swaps act on ' +
+        "the squad you hold today &mdash; pick a player without the IN tag, or edit the squad above.</div>");
+    }
+    o.push("</div>");
+    ah.innerHTML = o.join("");
+    ah.querySelectorAll("[data-act]").forEach(function (b) {
+      b.addEventListener("click", function () {
+        var act = b.dataset.act;
+        if (act === "close") {
+          ah.innerHTML = "";
+          host.querySelectorAll(".chip.sel").forEach(function (x) { x.classList.remove("sel"); });
+        } else if (act === "cap") {
+          captains[gw] = id; if (vices[gw] === id) delete vices[gw]; recompute();
+        } else if (act === "vice") {
+          vices[gw] = id; if (captains[gw] === id) delete captains[gw]; recompute();
+        } else if (act === "swap") {
+          var inn = +b.dataset["in"], i = state.squad.indexOf(id);
+          if (i >= 0) {
+            state.squad[i] = inn;
+            state.bank = +(state.bank + P[id].pr - P[inn].pr).toFixed(1);
+            captains = {}; vices = {}; save(); wireSwap(); recompute();
+          }
+        }
+      });
+    });
+    ah.scrollIntoView({ block: "nearest", behavior: "smooth" });
   }
 
   function renderPlayers(res, ids) {
@@ -457,6 +569,7 @@
   // ------------------------------------------------------------- recompute
   function recompute() {
     var btn = $("#liveRun");
+    document.body.classList.add("busy");
     if (btn) { btn.disabled = true; btn.textContent = "Working…"; }
     setTimeout(function () {
       var ids = state.squad;
@@ -486,6 +599,7 @@
         " points</b> across GW" + GWS[0] + "&ndash;" + GWS[GWS.length - 1] +
         ", against <b>" + horizon(ids, GWS).toFixed(0) + "</b> for standing still.";
       if (btn) { btn.disabled = false; btn.textContent = "Re-run"; }
+      document.body.classList.remove("busy");
     }, 10);
   }
   function set(id, v, s) {

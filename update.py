@@ -509,7 +509,7 @@ def main():
     dl_txt = dl.replace("T", " ")[:16] + " UTC" if dl else "-"
 
     ctx = {
-        "title": cfg.get("dashboard_title", "FPL Command Desk"),
+        "title": cfg.get("dashboard_title", "ADPREDFPL"),
         "season": "2026/27",
         "headline": "%s — GW%d to GW%d" % (cfg.get("manager", "Squad"), gws[0], gws[-1]),
         "header_meta": [

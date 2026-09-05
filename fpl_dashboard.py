@@ -9,6 +9,7 @@ CSS = """
   --teal:#0e8f7e; --rust:#bf5220; --amber:#a9761a; --violet:#5b4bb0;
   --good-fill:#8ccec1; --bad-fill:#e3a684; --mid-fill:#e7eae4;
   --chip:#e7ebe4; --shadow:0 1px 2px rgba(16,22,19,.06),0 8px 24px -16px rgba(16,22,19,.28);
+  --pitch:#d3e4d6; --pitch-line:#a6c2ad;
 }
 @media (prefers-color-scheme: dark){
   :root:not([data-theme="light"]){
@@ -18,6 +19,7 @@ CSS = """
     --teal:#17a189; --rust:#d96e2e; --amber:#d9a441; --violet:#9085e9;
     --good-fill:#124f47; --bad-fill:#6b3520; --mid-fill:#1d2723;
     --chip:#222d27; --shadow:0 1px 2px rgba(0,0,0,.4),0 8px 24px -16px rgba(0,0,0,.7);
+    --pitch:#15291f; --pitch-line:#2c4b3b;
   }
 }
 :root[data-theme="dark"]{
@@ -27,6 +29,7 @@ CSS = """
   --teal:#17a189; --rust:#d96e2e; --amber:#d9a441; --violet:#9085e9;
   --good-fill:#124f47; --bad-fill:#6b3520; --mid-fill:#1d2723;
   --chip:#222d27; --shadow:0 1px 2px rgba(0,0,0,.4),0 8px 24px -16px rgba(0,0,0,.7);
+  --pitch:#15291f; --pitch-line:#2c4b3b;
 }
 *{box-sizing:border-box}
 /* Must outrank every display rule below - a .panel{display:grid} silently
@@ -45,6 +48,81 @@ h3{font-size:15px; font-weight:700}
 .num{font-family:"IBM Plex Mono",ui-monospace,Consolas,monospace; font-variant-numeric:tabular-nums}
 .eyebrow{font-size:11px; font-weight:700; letter-spacing:.13em; text-transform:uppercase; color:var(--ink-3);
   font-family:Archivo,system-ui,sans-serif}
+
+/* brand */
+.brand{display:flex; align-items:center; gap:12px; text-decoration:none; color:inherit}
+.brand svg{width:44px; height:44px; flex:none}
+.brand .word{font-family:Archivo,system-ui,sans-serif; font-weight:800; font-size:26px;
+  letter-spacing:-.03em; line-height:1}
+.brand .word em{font-style:normal; color:var(--teal)}
+.brand .tag{display:block; font-size:11px; letter-spacing:.14em; text-transform:uppercase;
+  color:var(--ink-3); font-weight:700; margin-top:4px}
+
+/* sticky section nav */
+.nav{position:sticky; top:0; z-index:20; display:flex; gap:2px; overflow-x:auto;
+  background:color-mix(in oklab,var(--bg) 88%,transparent); backdrop-filter:blur(8px);
+  border-bottom:1px solid var(--line-2); margin:-8px -20px 0; padding:8px 20px; scrollbar-width:none}
+.nav::-webkit-scrollbar{display:none}
+.nav a{flex:none; font-family:Archivo,system-ui,sans-serif; font-size:11.5px; font-weight:700;
+  letter-spacing:.07em; text-transform:uppercase; color:var(--ink-2); text-decoration:none;
+  padding:7px 11px; border-radius:2px}
+.nav a:hover{background:var(--panel-2); color:var(--ink)}
+.nav a:focus-visible{outline:2px solid var(--teal); outline-offset:-2px}
+section[id]{scroll-margin-top:58px}
+
+/* working indicator */
+.busybar{position:fixed; top:0; left:0; right:0; height:3px; z-index:30; pointer-events:none;
+  background:linear-gradient(90deg,transparent,var(--teal),transparent); background-size:40% 100%;
+  opacity:0; transition:opacity .2s}
+body.busy .busybar{opacity:1; animation:slide 1.1s linear infinite}
+@keyframes slide{from{background-position:-40% 0}to{background-position:140% 0}}
+@media (prefers-reduced-motion:reduce){ body.busy .busybar{animation:none; background:var(--teal)} }
+
+/* pitch */
+.pitch{position:relative; background:var(--pitch); border:1px solid var(--pitch-line); border-radius:6px;
+  padding:16px 10px 12px; overflow:hidden; margin-bottom:12px}
+.pitch::before{content:""; position:absolute; inset:0; pointer-events:none; opacity:.55;
+  background:
+    linear-gradient(var(--pitch-line),var(--pitch-line)) center 50%/100% 1px no-repeat,
+    radial-gradient(circle at 50% 50%, transparent 46px, var(--pitch-line) 47px, var(--pitch-line) 48px, transparent 49px),
+    linear-gradient(var(--pitch-line),var(--pitch-line)) 50% 0/160px 1px no-repeat,
+    linear-gradient(var(--pitch-line),var(--pitch-line)) 50% 100%/160px 1px no-repeat}
+.pline{position:relative; display:flex; justify-content:center; gap:8px; flex-wrap:wrap; margin:7px 0}
+.chip{background:var(--panel); border:1px solid var(--line); border-radius:4px; padding:6px 8px 5px;
+  width:104px; text-align:center; cursor:pointer; position:relative; font-size:12px;
+  font-family:"Source Sans 3",system-ui,sans-serif; color:var(--ink); line-height:1.25}
+.chip:hover{border-color:var(--teal)}
+.chip:focus-visible{outline:2px solid var(--teal); outline-offset:2px}
+.chip.sel{border-color:var(--teal); box-shadow:0 0 0 2px color-mix(in oklab,var(--teal) 35%,transparent)}
+.chip .nm{display:block; font-weight:700; white-space:nowrap; overflow:hidden; text-overflow:ellipsis}
+.chip .fx{display:block; font-family:"IBM Plex Mono",monospace; font-size:10px; color:var(--ink-3)}
+.chip .pt{font-family:"IBM Plex Mono",monospace; font-weight:600; color:var(--teal); font-size:12.5px}
+.chip .arm{position:absolute; top:-8px; right:-7px; width:18px; height:18px; border-radius:99px;
+  display:grid; place-items:center; font:800 9.5px Archivo,system-ui,sans-serif; color:var(--bg);
+  background:var(--teal); border:2px solid var(--pitch)}
+.chip .arm.v{background:var(--ink-3)}
+.chip .new{position:absolute; top:-8px; left:-6px; font:800 8.5px Archivo,system-ui,sans-serif;
+  letter-spacing:.06em; background:var(--violet); color:var(--bg); padding:2px 5px; border-radius:2px}
+.pbench{position:relative; display:flex; justify-content:center; gap:8px; flex-wrap:wrap; margin-top:12px;
+  padding-top:11px; border-top:1px dashed var(--pitch-line)}
+.pbench .chip{opacity:.72; width:96px}
+.pbench .lbl{position:absolute; left:8px; top:-7px; font:700 9.5px Archivo,system-ui,sans-serif;
+  letter-spacing:.1em; color:var(--ink-3); background:var(--pitch); padding:0 4px}
+
+/* action panel under the pitch */
+.actp{border:1px solid var(--line-2); border-radius:3px; background:var(--panel); padding:12px 14px;
+  margin-bottom:12px; display:flex; flex-direction:column; gap:9px}
+.actp .who{display:flex; align-items:center; gap:10px; flex-wrap:wrap}
+.actp .who b{font-family:Archivo,system-ui,sans-serif; font-size:15px}
+.actp .btns{display:flex; gap:8px; flex-wrap:wrap}
+.alts{display:grid; grid-template-columns:repeat(auto-fill,minmax(190px,1fr)); gap:1px;
+  background:var(--line); border:1px solid var(--line); border-radius:3px; overflow:hidden;
+  max-height:220px; overflow-y:auto}
+.alt{display:flex; align-items:center; gap:7px; padding:7px 10px; background:var(--panel); border:none;
+  cursor:pointer; text-align:left; font:13px "Source Sans 3",system-ui,sans-serif; color:var(--ink)}
+.alt:hover{background:var(--panel-2)}
+.alt .d{margin-left:auto; font-family:"IBM Plex Mono",monospace; font-size:12px; color:var(--teal); font-weight:600}
+.alt .p{font-family:"IBM Plex Mono",monospace; font-size:11px; color:var(--ink-3)}
 
 /* header */
 header{display:flex; flex-wrap:wrap; gap:18px; align-items:flex-end; justify-content:space-between;
@@ -332,6 +410,24 @@ button.tg:focus-visible{outline:2px solid var(--teal); outline-offset:2px}
 @media (prefers-reduced-motion:no-preference){ .hc,button.tg{transition:background .18s ease,color .18s ease} }
 """
 
+LOGO = (
+    '<svg viewBox="0 0 44 44" aria-hidden="true" focusable="false">'
+    '<circle cx="22" cy="22" r="19" fill="none" stroke="currentColor" stroke-width="2.4"/>'
+    '<line x1="9" y1="30" x2="35" y2="30" stroke="currentColor" stroke-width="1.2" opacity=".35"/>'
+    '<path d="M8 30 C 15 30, 16.5 12, 22 12 S 29 30, 36 30" fill="none" stroke="var(--teal)" '
+    'stroke-width="2.8" stroke-linecap="round"/>'
+    '<circle cx="22" cy="12" r="3" fill="var(--teal)"/>'
+    "</svg>"
+)
+FAVICON = (
+    "data:image/svg+xml,"
+    "%3Csvg xmlns=%27http://www.w3.org/2000/svg%27 viewBox=%270 0 44 44%27%3E"
+    "%3Ccircle cx=%2722%27 cy=%2722%27 r=%2719%27 fill=%27none%27 stroke=%27%23101613%27 stroke-width=%273%27/%3E"
+    "%3Cpath d=%27M8 30 C 15 30, 16.5 12, 22 12 S 29 30, 36 30%27 fill=%27none%27 stroke=%27%230e8f7e%27 "
+    "stroke-width=%273.4%27 stroke-linecap=%27round%27/%3E"
+    "%3Ccircle cx=%2722%27 cy=%2712%27 r=%273.4%27 fill=%27%230e8f7e%27/%3E%3C/svg%3E"
+)
+
 TAB_JS = """
 (function(){
   document.querySelectorAll('[role="tablist"]').forEach(function(bar){
@@ -570,6 +666,7 @@ def render(ctx, path):
     # server that omits the charset otherwise renders every pound sign as mojibake.
     A('<meta charset="utf-8">')
     A('<title>%s</title>' % esc(ctx["title"]))
+    A('<link rel="icon" href="%s">' % FAVICON)
     A('<link rel="preconnect" href="https://fonts.googleapis.com">')
     A('<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>')
     A('<link rel="stylesheet" href="https://fonts.googleapis.com/css2?'
@@ -580,8 +677,9 @@ def render(ctx, path):
 
     # ---- start screen (first visit, or after "use a different team")
     A('<div id="startScreen" hidden><div class="start">')
-    A('<div><div class="eyebrow">Fantasy Premier League &middot; %s</div>'
-      "<h1>Set up your team</h1></div>" % esc(ctx["season"]))
+    A('<div><span class="brand">%s<span><span class="word">ADPRED<em>FPL</em></span>'
+      '<span class="tag">Projections &middot; simulation &middot; %s</span></span></span>'
+      '<h1 style="margin-top:18px">Set up your team</h1></div>' % (LOGO, esc(ctx["season"])))
     A('<p class="lede">This desk projects the next five gameweeks, plans your transfers deadline '
       "by deadline, and simulates the result thousands of times. It needs a squad to work from.</p>")
     A('<div class="choices">')
@@ -628,9 +726,12 @@ def render(ctx, path):
     A('<div id="appBody">')
 
     # ---- header
+    A('<div class="busybar" aria-hidden="true"></div>')
     A('<header><div>')
-    A('<div class="eyebrow">Fantasy Premier League &middot; %s</div>' % esc(ctx["season"]))
-    A("<h1>%s</h1>" % esc(ctx["headline"]))
+    A('<a class="brand" href="#top" id="top">%s<span><span class="word">ADPRED<em>FPL</em></span>'
+      '<span class="tag">Projections &middot; simulation &middot; %s</span></span></a>'
+      % (LOGO, esc(ctx["season"])))
+    A('<h1 style="margin-top:14px">%s</h1>' % esc(ctx["headline"]))
     A('<div class="tbadge" id="teamBadge" style="margin-top:7px"></div>')
     A('</div><div class="hmeta">')
     for lab, val in ctx["header_meta"]:
@@ -639,6 +740,10 @@ def render(ctx, path):
       '<button class="tg" id="rebuildTeam" type="button">Edit squad</button>'
       '<button class="tg" id="switchTeam" type="button">Use a different team</button></div>')
     A("</div></header>")
+    A('<nav class="nav" aria-label="Sections">'
+      '<a href="#plan">Plan</a><a href="#sim">Simulation</a><a href="#squad">Squad</a>'
+      '<a href="#transfers">Transfers</a><a href="#fixtures">Fixtures</a>'
+      '<a href="#targets">Targets</a><a href="#news">News</a></nav>')
 
     # ---- verdict
     v = ctx["verdict"]
@@ -663,7 +768,7 @@ def render(ctx, path):
 
     # ---- simulation, tabbed
     if ctx.get("payload"):
-        A('<section><div class="shead"><h2>Simulation</h2>'
+        A('<section id="sim"><div class="shead"><h2>Simulation</h2>'
           '<p>Every number here is resampled in your browser. Change a captain or swap a '
           'player and all three views recompute together.</p></div>')
         A('<div class="ctl">'
@@ -748,7 +853,7 @@ def render(ctx, path):
 
     # ---- week-by-week plan, tabbed
     if ctx.get("week_tabs"):
-        A('<section><div class="shead"><h2>The plan, week by week</h2>'
+        A('<section id="plan"><div class="shead"><h2>The plan, week by week</h2>'
           '<p>%s</p></div>' % ctx["week_tabs_sub"])
         A('<p class="note" id="planSummary"></p>')
         A('<div id="weekHost">')
@@ -756,7 +861,7 @@ def render(ctx, path):
         A("</div></section>")
 
     # ---- squad
-    A('<section><div class="shead"><h2>Your squad, week by week</h2>'
+    A('<section id="squad"><div class="shead"><h2>Your squad, week by week</h2>'
       '<p>Projected points per gameweek. Colour runs from a favourable fixture to a hostile one.</p></div>')
     A('<div class="tw"><table><thead><tr><th>Player</th><th>Pos</th><th class="n">&pound;</th>')
     for g in gws:
@@ -783,7 +888,7 @@ def render(ctx, path):
     A("</tbody></table></div></section>")
 
     # ---- transfers
-    A('<section><div class="shead"><h2>%s</h2><p>%s</p></div>' % (esc(ctx["plan"]["title"]), ctx["plan"]["sub"]))
+    A('<section id="transfers"><div class="shead"><h2>%s</h2><p>%s</p></div>' % (esc(ctx["plan"]["title"]), ctx["plan"]["sub"]))
     A('<div class="ledger">')
     for m in ctx["plan"]["moves"]:
         A('<div class="row"><div class="out"><span class="pname">%s</span><span class="tm">%s</span>'
@@ -798,7 +903,7 @@ def render(ctx, path):
     A("</section>")
 
     # ---- fixture grid
-    A('<section><div class="shead"><h2>Fixture swing, GW%d&ndash;%d</h2>' % (gws[0], gws[-1]))
+    A('<section id="fixtures"><div class="shead"><h2>Fixture swing, GW%d&ndash;%d</h2>' % (gws[0], gws[-1]))
     A('<p>Every club, by modelled expected goals. Switch the scale to read it from a defender&rsquo;s side.</p>'
       '</div>')
     A('<div class="legend"><button class="tg" data-view="att" aria-pressed="true">Attack</button>'
@@ -825,7 +930,7 @@ def render(ctx, path):
     A("</tbody></table></div></section>")
 
     # ---- target boards
-    A('<section><div class="shead"><h2>Transfer targets by position</h2>'
+    A('<section id="targets"><div class="shead"><h2>Transfer targets by position</h2>'
       '<p>Ranked on projected points across the window, not on last week&rsquo;s haul.</p></div>')
     A('<div class="cols">')
     for pos, rows in ctx["targets"].items():
@@ -850,7 +955,7 @@ def render(ctx, path):
           % (esc(p["name"]), esc(p["team_short"]), esc(p["pos"]), duty(p), p["price"], p["total"], p["sel"]))
     A("</tbody></table></div></section>")
 
-    A('<section><div class="shead"><h2>Availability watchlist</h2><p>Live from the FPL feed.</p></div>')
+    A('<section id="news"><div class="shead"><h2>Availability watchlist</h2><p>Live from the FPL feed.</p></div>')
     A('<div class="tw"><table><thead><tr><th>Player</th><th>Note</th></tr></thead><tbody>')
     for n in ctx["watch"]:
         A('<tr><td><span class="pname">%s</span><span class="tm">%s</span></td><td>%s %s</td></tr>'

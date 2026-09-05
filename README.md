@@ -1,7 +1,26 @@
-# FPL Command Desk
+# ADPREDFPL
 
-A projection model and strategy dashboard for Fantasy Premier League 2026/27,
-built on the official FPL API.
+A projection model, week-by-week planner and Monte Carlo simulator for Fantasy
+Premier League 2026/27, built on the official FPL API.
+
+The mark is the kick-off circle with a probability curve through it and a dot on
+the median - the same language the charts on the page use. It is inline SVG
+drawn from the theme tokens, so it recolours with light and dark mode; a static
+copy serves as the favicon on GitHub Pages.
+
+## Using the page
+
+- **Sticky section nav** under the header jumps to Plan, Simulation, Squad,
+  Transfers, Fixtures, Targets and News.
+- **The pitch** on every gameweek tab shows that week's XI in formation with the
+  bench beneath. Click any player to open an action panel: make them captain or
+  vice for that week, or - for a player you hold today - swap them for any legal
+  alternative, ranked by projected gain over the remaining weeks and filtered to
+  what you can afford and the three-per-club cap. Players a planned transfer
+  brings in carry an IN tag.
+- Any change recomputes the plan, the simulation and the per-player grid, and
+  the tab you were on stays selected. A thin bar at the top of the page shows
+  while that runs.
 
 ## Refresh it each week
 
