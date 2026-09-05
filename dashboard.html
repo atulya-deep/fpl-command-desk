@@ -1,0 +1,646 @@
+<title>FPL Command Desk</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Archivo:wght@700;800&family=IBM+Plex+Mono:wght@500;600&family=Source+Sans+3:wght@400;600&display=swap">
+<style>
+:root{
+  color-scheme: light;
+  --bg:#f4f6f2; --panel:#ffffff; --panel-2:#eef1ec; --line:#dbe0d8; --line-2:#c7cec3;
+  --ink:#101613; --ink-2:#4a544d; --ink-3:#78827a;
+  --teal:#0e8f7e; --rust:#bf5220; --amber:#a9761a; --violet:#5b4bb0;
+  --good-fill:#8ccec1; --bad-fill:#e3a684; --mid-fill:#e7eae4;
+  --chip:#e7ebe4; --shadow:0 1px 2px rgba(16,22,19,.06),0 8px 24px -16px rgba(16,22,19,.28);
+}
+@media (prefers-color-scheme: dark){
+  :root:not([data-theme="light"]){
+    color-scheme: dark;
+    --bg:#0f1512; --panel:#171f1b; --panel-2:#1e2823; --line:#2a352f; --line-2:#3a473f;
+    --ink:#eef2ec; --ink-2:#a8b3ab; --ink-3:#7d887f;
+    --teal:#17a189; --rust:#d96e2e; --amber:#d9a441; --violet:#9085e9;
+    --good-fill:#124f47; --bad-fill:#6b3520; --mid-fill:#1d2723;
+    --chip:#222d27; --shadow:0 1px 2px rgba(0,0,0,.4),0 8px 24px -16px rgba(0,0,0,.7);
+  }
+}
+:root[data-theme="dark"]{
+  color-scheme: dark;
+  --bg:#0f1512; --panel:#171f1b; --panel-2:#1e2823; --line:#2a352f; --line-2:#3a473f;
+  --ink:#eef2ec; --ink-2:#a8b3ab; --ink-3:#7d887f;
+  --teal:#17a189; --rust:#d96e2e; --amber:#d9a441; --violet:#9085e9;
+  --good-fill:#124f47; --bad-fill:#6b3520; --mid-fill:#1d2723;
+  --chip:#222d27; --shadow:0 1px 2px rgba(0,0,0,.4),0 8px 24px -16px rgba(0,0,0,.7);
+}
+*{box-sizing:border-box}
+body{
+  background:var(--bg); color:var(--ink); margin:0;
+  font-family:"Source Sans 3","Segoe UI",system-ui,sans-serif;
+  font-size:15px; line-height:1.5; -webkit-font-smoothing:antialiased;
+}
+.wrap{max-width:1180px; margin:0 auto; padding:28px 20px 72px; display:flex; flex-direction:column; gap:30px}
+h1,h2,h3{font-family:Archivo,"Arial Narrow",system-ui,sans-serif; margin:0; text-wrap:balance; letter-spacing:-.015em}
+h1{font-size:clamp(28px,4.4vw,42px); font-weight:800; line-height:1.03}
+h2{font-size:19px; font-weight:700}
+h3{font-size:15px; font-weight:700}
+.num{font-family:"IBM Plex Mono",ui-monospace,Consolas,monospace; font-variant-numeric:tabular-nums}
+.eyebrow{font-size:11px; font-weight:700; letter-spacing:.13em; text-transform:uppercase; color:var(--ink-3);
+  font-family:Archivo,system-ui,sans-serif}
+
+/* header */
+header{display:flex; flex-wrap:wrap; gap:18px; align-items:flex-end; justify-content:space-between;
+  border-bottom:2px solid var(--ink); padding-bottom:16px}
+.hmeta{display:flex; gap:22px; flex-wrap:wrap}
+.hmeta div{display:flex; flex-direction:column; gap:2px}
+.hmeta b{font-size:16px; font-weight:600}
+
+/* decision strip */
+.verdict{background:var(--panel); border:1px solid var(--line); border-left:5px solid var(--teal);
+  border-radius:3px; padding:20px 22px; box-shadow:var(--shadow); display:flex; flex-direction:column; gap:10px}
+.verdict p{margin:0; color:var(--ink-2); max-width:74ch}
+.verdict .call{font-family:Archivo,system-ui,sans-serif; font-size:22px; font-weight:800; line-height:1.2}
+
+/* kpi row */
+.kpis{display:grid; grid-template-columns:repeat(auto-fit,minmax(168px,1fr)); gap:1px; background:var(--line);
+  border:1px solid var(--line); border-radius:3px; overflow:hidden}
+.kpi{background:var(--panel); padding:15px 16px; display:flex; flex-direction:column; gap:4px}
+.kpi .v{font-family:"IBM Plex Mono",monospace; font-size:27px; font-weight:600; line-height:1;
+  font-variant-numeric:tabular-nums}
+.kpi .s{font-size:12.5px; color:var(--ink-3)}
+
+section{display:flex; flex-direction:column; gap:14px}
+.shead{display:flex; align-items:baseline; justify-content:space-between; gap:14px; flex-wrap:wrap;
+  border-bottom:1px solid var(--line-2); padding-bottom:7px}
+.shead p{margin:0; font-size:13px; color:var(--ink-3); max-width:60ch}
+
+/* tables */
+.tw{overflow-x:auto; border:1px solid var(--line); border-radius:3px; background:var(--panel)}
+table{border-collapse:collapse; width:100%; font-size:13.5px}
+th{font-family:Archivo,system-ui,sans-serif; font-size:10.5px; letter-spacing:.09em; text-transform:uppercase;
+  color:var(--ink-3); text-align:left; padding:9px 10px; border-bottom:1px solid var(--line-2); white-space:nowrap;
+  background:var(--panel)}
+td{padding:8px 10px; border-bottom:1px solid var(--line); white-space:nowrap}
+tbody tr:last-child td{border-bottom:none}
+tbody tr:hover td{background:var(--panel-2)}
+td.n,th.n{text-align:right; font-family:"IBM Plex Mono",monospace; font-variant-numeric:tabular-nums}
+.pname{font-weight:600}
+.tm{font-family:"IBM Plex Mono",monospace; font-size:11px; color:var(--ink-3); margin-left:6px}
+.pos{display:inline-block; min-width:34px; text-align:center; font-family:Archivo,system-ui,sans-serif;
+  font-size:10px; font-weight:700; letter-spacing:.06em; padding:2px 5px; border-radius:2px;
+  background:var(--chip); color:var(--ink-2)}
+
+/* inline projection bar */
+.bar{position:relative; height:16px; min-width:104px; background:var(--panel-2); border-radius:2px; overflow:hidden}
+.bar span{position:absolute; inset:0 auto 0 0; background:var(--teal); border-radius:0 2px 2px 0}
+.bar b{position:absolute; right:5px; top:0; line-height:16px; font-size:11px; font-weight:600;
+  font-family:"IBM Plex Mono",monospace; color:var(--ink)}
+
+/* heat cells */
+.hc{display:block; padding:6px 5px; border-radius:2px; text-align:center; font-family:"IBM Plex Mono",monospace;
+  font-size:11.5px; line-height:1.25; background:var(--mid-fill); color:var(--ink)}
+.hc.good{background:color-mix(in oklab, var(--good-fill) calc(var(--t)*100%), var(--mid-fill))}
+.hc.bad{background:color-mix(in oklab, var(--bad-fill) calc(var(--t)*100%), var(--mid-fill))}
+.hc small{display:block; font-size:9.5px; color:var(--ink-2); letter-spacing:.02em}
+.grid td{padding:3px}
+.grid th.gw{text-align:center}
+
+/* legend */
+.legend{display:flex; align-items:center; gap:9px; font-size:12px; color:var(--ink-3); flex-wrap:wrap}
+.ramp{display:flex; height:11px; border-radius:2px; overflow:hidden; width:150px; border:1px solid var(--line)}
+.ramp i{flex:1}
+
+/* week plan */
+.weeks{display:grid; grid-template-columns:repeat(auto-fit,minmax(196px,1fr)); gap:12px}
+.week{background:var(--panel); border:1px solid var(--line); border-radius:3px; padding:14px 15px;
+  display:flex; flex-direction:column; gap:9px}
+.week .wn{display:flex; align-items:baseline; gap:8px}
+.week .wn i{font-family:Archivo,system-ui,sans-serif; font-style:normal; font-size:11px; font-weight:800;
+  color:var(--ink-3); letter-spacing:.08em}
+.week .cap{font-weight:600; font-size:15px}
+.week .cap em{font-style:normal; color:var(--ink-3); font-weight:400; font-size:12px; display:block}
+.week ul{margin:0; padding:0; list-style:none; display:flex; flex-direction:column; gap:5px;
+  border-top:1px solid var(--line); padding-top:9px}
+.week li{display:flex; justify-content:space-between; gap:8px; font-size:12.5px; color:var(--ink-2)}
+.week li b{font-family:"IBM Plex Mono",monospace; font-weight:600; color:var(--ink)}
+
+/* ledger */
+.ledger{display:flex; flex-direction:column; gap:1px; background:var(--line); border:1px solid var(--line);
+  border-radius:3px; overflow:hidden}
+.row{background:var(--panel); display:grid; grid-template-columns:1fr auto 1fr auto; gap:14px; align-items:center;
+  padding:12px 15px}
+.row .out .pname{text-decoration:line-through; text-decoration-color:var(--rust); text-decoration-thickness:2px}
+.row .arrow{color:var(--ink-3); font-family:"IBM Plex Mono",monospace}
+.row .gain{font-family:"IBM Plex Mono",monospace; font-weight:600; color:var(--teal); font-size:15px}
+.row .sub{font-size:11.5px; color:var(--ink-3); font-family:"IBM Plex Mono",monospace}
+@media (max-width:640px){ .row{grid-template-columns:1fr auto; gap:8px} .row .arrow{display:none} }
+
+/* pills */
+.pill{display:inline-flex; align-items:center; gap:5px; font-size:11px; font-weight:700; padding:2px 8px;
+  border-radius:99px; font-family:Archivo,system-ui,sans-serif; letter-spacing:.04em}
+.pill.out{background:color-mix(in oklab,var(--rust) 16%,var(--panel)); color:var(--rust)}
+.pill.warn{background:color-mix(in oklab,var(--amber) 20%,var(--panel)); color:var(--amber)}
+.pill.ok{background:color-mix(in oklab,var(--teal) 16%,var(--panel)); color:var(--teal)}
+.pill::before{content:""; width:5px; height:5px; border-radius:99px; background:currentColor}
+
+.cols{display:grid; grid-template-columns:repeat(auto-fit,minmax(272px,1fr)); gap:16px}
+.note{font-size:12.5px; color:var(--ink-3); line-height:1.6; max-width:78ch}
+.note code{font-family:"IBM Plex Mono",monospace; font-size:11.5px; background:var(--chip); padding:1px 5px;
+  border-radius:2px}
+footer{border-top:1px solid var(--line-2); padding-top:16px; display:flex; flex-direction:column; gap:8px}
+button.tg{font-family:Archivo,system-ui,sans-serif; font-size:11px; font-weight:700; letter-spacing:.07em;
+  text-transform:uppercase; padding:5px 11px; border:1px solid var(--line-2); background:var(--panel);
+  color:var(--ink-2); border-radius:2px; cursor:pointer}
+button.tg[aria-pressed="true"]{background:var(--ink); color:var(--bg); border-color:var(--ink)}
+button.tg:focus-visible{outline:2px solid var(--teal); outline-offset:2px}
+@media (prefers-reduced-motion:no-preference){ .hc,button.tg{transition:background .18s ease,color .18s ease} }
+</style>
+<div class="wrap">
+<header><div>
+<div class="eyebrow">Fantasy Premier League &middot; 2026/27</div>
+<h1>Gusta — GW4 to GW8</h1>
+</div><div class="hmeta">
+<div><span class="eyebrow">GW4 deadline</span><b class="num">2026-09-12 12:30 UTC</b></div>
+<div><span class="eyebrow">Squad value</span><b class="num">£100.4</b></div>
+<div><span class="eyebrow">In the bank</span><b class="num">£0.0</b></div>
+<div><span class="eyebrow">Updated</span><b class="num">05 Sep 2026, 13:38</b></div>
+</div></header>
+<div class="verdict"><span class="eyebrow">The call for GW4</span>
+<div class="call">Play the first Wildcard now.</div>
+<p>The model rates a rebuilt squad 59 points higher than the current one across GW4&ndash;8. That gap is not one bad pick &mdash; it is 7 of your 15 slots projecting under 16 points for the window, including Verbruggen, Kinsky, Ajer, Maguire.</p>
+<p>Fixing that with weekly transfers costs roughly 7 gameweeks and up to 24 points in hits. The Wildcard does it in one move, and it expires at GW19, so spending it on a six-slot repair is what the chip is for.</p>
+<p>Non-negotiable either way: <b>Rodon</b> is dead weight &mdash; Hamstring injury - Expected back 21 Nov.</p>
+</div>
+<div class="kpis">
+<div class="kpi"><span class="eyebrow">Projected GW4-8</span><span class="v">302</span><span class="s">points as the squad stands</span></div>
+<div class="kpi"><span class="eyebrow">Per gameweek</span><span class="v">60</span><span class="s">average across the window</span></div>
+<div class="kpi"><span class="eyebrow">Wildcard ceiling</span><span class="v">361</span><span class="s">+59 if fully rebuilt</span></div>
+<div class="kpi"><span class="eyebrow">Slots underperforming</span><span class="v">7</span><span class="s">of 15 projecting under 16 pts</span></div>
+</div>
+<section><div class="shead"><h2>The five-week sequence</h2><p>Each week&rsquo;s projected XI total, captain, and the fixture that decides it.</p></div>
+<div class="weeks">
+<div class="week"><div class="wn"><i>WEEK 1</i><span class="eyebrow">GW4</span></div>
+<div class="cap">B.Fernandes <em>captain &middot; MCI (H)</em></div>
+<ul>
+<li><span>Projected XI</span><b>57 pts</b></li>
+<li><span>Formation</span><b>3-4-3</b></li>
+<li><span>Alt: Szoboszlai</span><b>5.9</b></li>
+<li><span>Alt: João Pedro</span><b>5.6</b></li>
+<li><span>Alt: Calvert-Lewin</span><b>5.3</b></li>
+</ul></div>
+<div class="week"><div class="wn"><i>WEEK 2</i><span class="eyebrow">GW5</span></div>
+<div class="cap">B.Fernandes <em>captain &middot; FUL (A)</em></div>
+<ul>
+<li><span>Projected XI</span><b>63 pts</b></li>
+<li><span>Formation</span><b>3-4-3</b></li>
+<li><span>Alt: Haaland</span><b>7.0</b></li>
+<li><span>Alt: Foden</span><b>6.7</b></li>
+<li><span>Alt: Calvert-Lewin</span><b>5.3</b></li>
+</ul></div>
+<div class="week"><div class="wn"><i>WEEK 3</i><span class="eyebrow">GW6</span></div>
+<div class="cap">B.Fernandes <em>captain &middot; TOT (H)</em></div>
+<ul>
+<li><span>Projected XI</span><b>57 pts</b></li>
+<li><span>Formation</span><b>3-5-2</b></li>
+<li><span>Alt: Calafiori</span><b>5.8</b></li>
+<li><span>Alt: João Pedro</span><b>5.2</b></li>
+<li><span>Alt: Haaland</span><b>5.0</b></li>
+</ul></div>
+<div class="week"><div class="wn"><i>WEEK 4</i><span class="eyebrow">GW7</span></div>
+<div class="cap">Haaland <em>captain &middot; IPS (H)</em></div>
+<ul>
+<li><span>Projected XI</span><b>61 pts</b></li>
+<li><span>Formation</span><b>3-4-3</b></li>
+<li><span>Alt: Foden</span><b>7.3</b></li>
+<li><span>Alt: B.Fernandes</span><b>7.2</b></li>
+<li><span>Alt: Calafiori</span><b>4.8</b></li>
+</ul></div>
+<div class="week"><div class="wn"><i>WEEK 5</i><span class="eyebrow">GW8</span></div>
+<div class="cap">B.Fernandes <em>captain &middot; BOU (H)</em></div>
+<ul>
+<li><span>Projected XI</span><b>63 pts</b></li>
+<li><span>Formation</span><b>3-4-3</b></li>
+<li><span>Alt: Haaland</span><b>6.2</b></li>
+<li><span>Alt: Foden</span><b>5.8</b></li>
+<li><span>Alt: Calafiori</span><b>5.6</b></li>
+</ul></div>
+</div></section>
+<section><div class="shead"><h2>Your squad, week by week</h2><p>Projected points per gameweek. Colour runs from a favourable fixture to a hostile one.</p></div>
+<div class="tw"><table><thead><tr><th>Player</th><th>Pos</th><th class="n">&pound;</th>
+<th class="gw">GW4</th>
+<th class="gw">GW5</th>
+<th class="gw">GW6</th>
+<th class="gw">GW7</th>
+<th class="gw">GW8</th>
+<th>5&#8209;GW projection</th><th>Status</th></tr></thead><tbody>
+<tr>
+<td><span class="pname">Kinsky</span><span class="tm">TOT</span></td>
+<td><span class="pos">GK</span></td><td class="n">4.5</td>
+<td class="grid"><span class="hc good" data-att="0.243" data-def="0.248" style="--t:0.243">EVE<small>H &amp;middot; 2.9</small></span></td>
+<td class="grid"><span class="hc good" data-att="0.235" data-def="0.571" style="--t:0.235">AVL<small>H &amp;middot; 3.3</small></span></td>
+<td class="grid"><span class="hc bad" data-att="-0.461" data-def="-1.000" style="--t:0.461">MUN<small>A &amp;middot; 2.1</small></span></td>
+<td class="grid"><span class="hc good" data-att="0.278" data-def="0.581" style="--t:0.278">COV<small>H &amp;middot; 3.3</small></span></td>
+<td class="grid"><span class="hc bad" data-att="-0.435" data-def="-0.829" style="--t:0.435">CHE<small>A &amp;middot; 2.2</small></span></td>
+<td><div class="bar"><span style="width:36.1%"></span><b>13.9</b></div></td>
+<td><span class="pill ok">Fit</span></td>
+</tr>
+<tr>
+<td><span class="pname">Verbruggen</span><span class="tm">BHA</span></td>
+<td><span class="pos">GK</span></td><td class="n">4.5</td>
+<td class="grid"><span class="hc good" data-att="0.148" data-def="0.267" style="--t:0.148">COV<small>A &amp;middot; 2.6</small></span></td>
+<td class="grid"><span class="hc bad" data-att="-0.617" data-def="-0.629" style="--t:0.617">ARS<small>H &amp;middot; 1.7</small></span></td>
+<td class="grid"><span class="hc good" data-att="0.104" data-def="-0.019" style="--t:0.104">SUN<small>A &amp;middot; 2.2</small></span></td>
+<td class="grid"><span class="hc good" data-att="0.487" data-def="0.267" style="--t:0.487">CRY<small>H &amp;middot; 2.6</small></span></td>
+<td class="grid"><span class="hc bad" data-att="-0.383" data-def="-1.000" style="--t:0.383">LIV<small>A &amp;middot; 1.3</small></span></td>
+<td><div class="bar"><span style="width:27.3%"></span><b>10.5</b></div></td>
+<td><span class="pill ok">Fit</span></td>
+</tr>
+<tr>
+<td><span class="pname">Calafiori</span><span class="tm">ARS</span></td>
+<td><span class="pos">DEF</span></td><td class="n">5.7</td>
+<td class="grid"><span class="hc good" data-att="0.626" data-def="0.857" style="--t:0.626">SUN<small>A &amp;middot; 5.3</small></span></td>
+<td class="grid"><span class="hc good" data-att="0.574" data-def="0.676" style="--t:0.574">BHA<small>A &amp;middot; 4.9</small></span></td>
+<td class="grid"><span class="hc good" data-att="0.957" data-def="1.000" style="--t:0.957">LEE<small>H &amp;middot; 5.8</small></span></td>
+<td class="grid"><span class="hc good" data-att="0.287" data-def="0.733" style="--t:0.287">NFO<small>A &amp;middot; 4.8</small></span></td>
+<td class="grid"><span class="hc good" data-att="1.000" data-def="0.924" style="--t:1.000">EVE<small>H &amp;middot; 5.6</small></span></td>
+<td><div class="bar"><span style="width:69.0%"></span><b>26.4</b></div></td>
+<td><span class="pill ok">Fit</span></td>
+</tr>
+<tr>
+<td><span class="pname">Ajer</span><span class="tm">BRE</span></td>
+<td><span class="pos">DEF</span></td><td class="n">4.5</td>
+<td class="grid"><span class="hc good" data-att="0.165" data-def="0.019" style="--t:0.165">BOU<small>A &amp;middot; 3.1</small></span></td>
+<td class="grid"><span class="hc good" data-att="0.061" data-def="-0.181" style="--t:0.061">CHE<small>H &amp;middot; 2.8</small></span></td>
+<td class="grid"><span class="hc good" data-att="0.200" data-def="0.448" style="--t:0.200">AVL<small>A &amp;middot; 3.7</small></span></td>
+<td class="grid"><span class="hc bad" data-att="-0.052" data-def="-0.419" style="--t:0.052">LIV<small>H &amp;middot; 2.6</small></span></td>
+<td class="grid"><span class="hc good" data-att="0.391" data-def="0.448" style="--t:0.391">HUL<small>A &amp;middot; 3.7</small></span></td>
+<td><div class="bar"><span style="width:41.5%"></span><b>15.9</b></div></td>
+<td><span class="pill ok">Fit</span></td>
+</tr>
+<tr>
+<td><span class="pname">Maguire</span><span class="tm">MUN</span></td>
+<td><span class="pos">DEF</span></td><td class="n">5.0</td>
+<td class="grid"><span class="hc good" data-att="0.209" data-def="-0.495" style="--t:0.209">MCI<small>H &amp;middot; 2.1</small></span></td>
+<td class="grid"><span class="hc good" data-att="1.000" data-def="0.457" style="--t:1.000">FUL<small>A &amp;middot; 3.4</small></span></td>
+<td class="grid"><span class="hc good" data-att="1.000" data-def="0.505" style="--t:1.000">TOT<small>H &amp;middot; 3.5</small></span></td>
+<td class="grid"><span class="hc good" data-att="0.635" data-def="0.457" style="--t:0.635">LEE<small>A &amp;middot; 3.3</small></span></td>
+<td class="grid"><span class="hc good" data-att="1.000" data-def="0.467" style="--t:1.000">BOU<small>H &amp;middot; 3.4</small></span></td>
+<td><div class="bar"><span style="width:41.0%"></span><b>15.7</b></div></td>
+<td><span class="pill ok">Fit</span></td>
+</tr>
+<tr>
+<td><span class="pname">Diop</span><span class="tm">IPS</span></td>
+<td><span class="pos">DEF</span></td><td class="n">4.0</td>
+<td class="grid"><span class="hc bad" data-att="-0.078" data-def="-0.324" style="--t:0.078">CRY<small>A &amp;middot; 2.6</small></span></td>
+<td class="grid"><span class="hc bad" data-att="-0.070" data-def="-0.505" style="--t:0.070">EVE<small>A &amp;middot; 2.4</small></span></td>
+<td class="grid"><span class="hc good" data-att="0.478" data-def="0.152" style="--t:0.478">FUL<small>H &amp;middot; 3.2</small></span></td>
+<td class="grid"><span class="hc bad" data-att="-0.617" data-def="-1.000" style="--t:0.617">MCI<small>A &amp;middot; 1.2</small></span></td>
+<td class="grid"><span class="hc bad" data-att="-0.043" data-def="-0.210" style="--t:0.043">NFO<small>H &amp;middot; 2.7</small></span></td>
+<td><div class="bar"><span style="width:31.6%"></span><b>12.1</b></div></td>
+<td><span class="pill ok">Fit</span></td>
+</tr>
+<tr>
+<td><span class="pname">Rodon</span><span class="tm">LEE</span></td>
+<td><span class="pos">DEF</span></td><td class="n">4.5</td>
+<td class="grid"><span class="hc bad" data-att="-0.035" data-def="0.267" style="--t:0.035">NEW<small>H &amp;middot; 0.0</small></span></td>
+<td class="grid"><span class="hc bad" data-att="-0.035" data-def="0.314" style="--t:0.035">CRY<small>H &amp;middot; 0.0</small></span></td>
+<td class="grid"><span class="hc bad" data-att="-0.930" data-def="-1.000" style="--t:0.930">ARS<small>A &amp;middot; 0.0</small></span></td>
+<td class="grid"><span class="hc bad" data-att="-0.417" data-def="-0.695" style="--t:0.417">MUN<small>H &amp;middot; 0.0</small></span></td>
+<td class="grid"><span class="hc bad" data-att="-0.304" data-def="0.048" style="--t:0.304">SUN<small>A &amp;middot; 0.0</small></span></td>
+<td><div class="bar"><span style="width:3.0%"></span><b>0.0</b></div></td>
+<td><span class="pill out">Out</span></td>
+</tr>
+<tr>
+<td><span class="pname">B.Fernandes</span><span class="tm">MUN</span></td>
+<td><span class="pos">MID</span></td><td class="n">12.0</td>
+<td class="grid"><span class="hc good" data-att="0.209" data-def="-0.495" style="--t:0.209">MCI<small>H &amp;middot; 6.3</small></span></td>
+<td class="grid"><span class="hc good" data-att="1.000" data-def="0.457" style="--t:1.000">FUL<small>A &amp;middot; 8.2</small></span></td>
+<td class="grid"><span class="hc good" data-att="1.000" data-def="0.505" style="--t:1.000">TOT<small>H &amp;middot; 8.1</small></span></td>
+<td class="grid"><span class="hc good" data-att="0.635" data-def="0.457" style="--t:0.635">LEE<small>A &amp;middot; 7.2</small></span></td>
+<td class="grid"><span class="hc good" data-att="1.000" data-def="0.467" style="--t:1.000">BOU<small>H &amp;middot; 8.5</small></span></td>
+<td><div class="bar"><span style="width:100.0%"></span><b>38.3</b></div></td>
+<td><span class="pill ok">Fit</span></td>
+</tr>
+<tr>
+<td><span class="pname">Foden</span><span class="tm">MCI</span></td>
+<td><span class="pos">MID</span></td><td class="n">7.0</td>
+<td class="grid"><span class="hc good" data-att="0.452" data-def="-0.229" style="--t:0.452">MUN<small>A &amp;middot; 4.5</small></span></td>
+<td class="grid"><span class="hc good" data-att="1.000" data-def="0.762" style="--t:1.000">SUN<small>H &amp;middot; 6.7</small></span></td>
+<td class="grid"><span class="hc good" data-att="0.348" data-def="-0.210" style="--t:0.348">LIV<small>A &amp;middot; 4.3</small></span></td>
+<td class="grid"><span class="hc good" data-att="1.000" data-def="0.676" style="--t:1.000">IPS<small>H &amp;middot; 7.3</small></span></td>
+<td class="grid"><span class="hc good" data-att="1.000" data-def="0.743" style="--t:1.000">AVL<small>A &amp;middot; 5.8</small></span></td>
+<td><div class="bar"><span style="width:74.4%"></span><b>28.5</b></div></td>
+<td><span class="pill ok">Fit</span></td>
+</tr>
+<tr>
+<td><span class="pname">Szoboszlai</span><span class="tm">LIV</span></td>
+<td><span class="pos">MID</span></td><td class="n">7.0</td>
+<td class="grid"><span class="hc good" data-att="1.000" data-def="0.705" style="--t:1.000">FUL<small>H &amp;middot; 5.9</small></span></td>
+<td class="grid"><span class="hc good" data-att="0.722" data-def="0.286" style="--t:0.722">BOU<small>A &amp;middot; 4.8</small></span></td>
+<td class="grid"><span class="hc good" data-att="0.191" data-def="-0.381" style="--t:0.191">MCI<small>H &amp;middot; 4.1</small></span></td>
+<td class="grid"><span class="hc good" data-att="0.383" data-def="0.057" style="--t:0.383">BRE<small>A &amp;middot; 4.4</small></span></td>
+<td class="grid"><span class="hc good" data-att="1.000" data-def="0.419" style="--t:1.000">BHA<small>H &amp;middot; 5.3</small></span></td>
+<td><div class="bar"><span style="width:64.0%"></span><b>24.5</b></div></td>
+<td><span class="pill ok">Fit</span></td>
+</tr>
+<tr>
+<td><span class="pname">Schade</span><span class="tm">BRE</span></td>
+<td><span class="pos">MID</span></td><td class="n">6.0</td>
+<td class="grid"><span class="hc good" data-att="0.165" data-def="0.019" style="--t:0.165">BOU<small>A &amp;middot; 4.0</small></span></td>
+<td class="grid"><span class="hc good" data-att="0.061" data-def="-0.181" style="--t:0.061">CHE<small>H &amp;middot; 3.9</small></span></td>
+<td class="grid"><span class="hc good" data-att="0.200" data-def="0.448" style="--t:0.200">AVL<small>A &amp;middot; 4.1</small></span></td>
+<td class="grid"><span class="hc bad" data-att="-0.052" data-def="-0.419" style="--t:0.052">LIV<small>H &amp;middot; 3.8</small></span></td>
+<td class="grid"><span class="hc good" data-att="0.391" data-def="0.448" style="--t:0.391">HUL<small>A &amp;middot; 4.3</small></span></td>
+<td><div class="bar"><span style="width:52.3%"></span><b>20.0</b></div></td>
+<td><span class="pill ok">Fit</span></td>
+</tr>
+<tr>
+<td><span class="pname">Tzolis</span><span class="tm">ARS</span></td>
+<td><span class="pos">MID</span></td><td class="n">6.5</td>
+<td class="grid"><span class="hc good" data-att="0.626" data-def="0.857" style="--t:0.626">SUN<small>A &amp;middot; 3.1</small></span></td>
+<td class="grid"><span class="hc good" data-att="0.574" data-def="0.676" style="--t:0.574">BHA<small>A &amp;middot; 3.0</small></span></td>
+<td class="grid"><span class="hc good" data-att="0.957" data-def="1.000" style="--t:0.957">LEE<small>H &amp;middot; 3.3</small></span></td>
+<td class="grid"><span class="hc good" data-att="0.287" data-def="0.733" style="--t:0.287">NFO<small>A &amp;middot; 2.8</small></span></td>
+<td class="grid"><span class="hc good" data-att="1.000" data-def="0.924" style="--t:1.000">EVE<small>H &amp;middot; 3.3</small></span></td>
+<td><div class="bar"><span style="width:40.4%"></span><b>15.5</b></div></td>
+<td><span class="pill ok">Fit</span></td>
+</tr>
+<tr>
+<td><span class="pname">Haaland</span><span class="tm">MCI</span></td>
+<td><span class="pos">FWD</span></td><td class="n">15.5</td>
+<td class="grid"><span class="hc good" data-att="0.452" data-def="-0.229" style="--t:0.452">MUN<small>A &amp;middot; 5.1</small></span></td>
+<td class="grid"><span class="hc good" data-att="1.000" data-def="0.762" style="--t:1.000">SUN<small>H &amp;middot; 7.0</small></span></td>
+<td class="grid"><span class="hc good" data-att="0.348" data-def="-0.210" style="--t:0.348">LIV<small>A &amp;middot; 5.0</small></span></td>
+<td class="grid"><span class="hc good" data-att="1.000" data-def="0.676" style="--t:1.000">IPS<small>H &amp;middot; 7.7</small></span></td>
+<td class="grid"><span class="hc good" data-att="1.000" data-def="0.743" style="--t:1.000">AVL<small>A &amp;middot; 6.2</small></span></td>
+<td><div class="bar"><span style="width:81.0%"></span><b>31.0</b></div></td>
+<td><span class="pill ok">Fit</span></td>
+</tr>
+<tr>
+<td><span class="pname">João Pedro</span><span class="tm">CHE</span></td>
+<td><span class="pos">FWD</span></td><td class="n">7.7</td>
+<td class="grid"><span class="hc good" data-att="1.000" data-def="0.743" style="--t:1.000">HUL<small>H &amp;middot; 5.6</small></span></td>
+<td class="grid"><span class="hc good" data-att="0.165" data-def="-0.067" style="--t:0.165">BRE<small>A &amp;middot; 4.4</small></span></td>
+<td class="grid"><span class="hc good" data-att="0.930" data-def="0.438" style="--t:0.930">BOU<small>H &amp;middot; 5.2</small></span></td>
+<td class="grid"><span class="hc good" data-att="0.522" data-def="0.229" style="--t:0.522">EVE<small>A &amp;middot; 4.8</small></span></td>
+<td class="grid"><span class="hc good" data-att="0.757" data-def="0.476" style="--t:0.757">TOT<small>H &amp;middot; 5.0</small></span></td>
+<td><div class="bar"><span style="width:65.3%"></span><b>25.0</b></div></td>
+<td><span class="pill ok">Fit</span></td>
+</tr>
+<tr>
+<td><span class="pname">Calvert-Lewin</span><span class="tm">LEE</span></td>
+<td><span class="pos">FWD</span></td><td class="n">6.0</td>
+<td class="grid"><span class="hc bad" data-att="-0.035" data-def="0.267" style="--t:0.035">NEW<small>H &amp;middot; 5.3</small></span></td>
+<td class="grid"><span class="hc bad" data-att="-0.035" data-def="0.314" style="--t:0.035">CRY<small>H &amp;middot; 5.3</small></span></td>
+<td class="grid"><span class="hc bad" data-att="-0.930" data-def="-1.000" style="--t:0.930">ARS<small>A &amp;middot; 3.1</small></span></td>
+<td class="grid"><span class="hc bad" data-att="-0.417" data-def="-0.695" style="--t:0.417">MUN<small>H &amp;middot; 4.3</small></span></td>
+<td class="grid"><span class="hc bad" data-att="-0.304" data-def="0.048" style="--t:0.304">SUN<small>A &amp;middot; 4.6</small></span></td>
+<td><div class="bar"><span style="width:59.0%"></span><b>22.6</b></div></td>
+<td><span class="pill ok">Fit</span></td>
+</tr>
+</tbody></table></div></section>
+<section><div class="shead"><h2>Wildcard draft — 12 changes</h2><p>Spends £100.3 of £100.4. Keeps Calafiori, Foden, Haaland.</p></div>
+<div class="ledger">
+<div class="row"><div class="out"><span class="pname">Rodon</span><span class="tm">LEE</span><div class="sub">£4.5 · 0 pts projected</div></div><div class="arrow">&rarr;</div><div class="in"><span class="pname">Saka</span><span class="tm">ARS</span><div class="sub">£9.5 · 44 pts projected</div></div><div class="gain">+44</div></div>
+<div class="row"><div class="out"><span class="pname">Verbruggen</span><span class="tm">BHA</span><div class="sub">£4.5 · 10 pts projected</div></div><div class="arrow">&rarr;</div><div class="in"><span class="pname">Guéhi</span><span class="tm">MCI</span><div class="sub">£6.0 · 28 pts projected</div></div><div class="gain">+18</div></div>
+<div class="row"><div class="out"><span class="pname">Diop</span><span class="tm">IPS</span><div class="sub">£4.0 · 12 pts projected</div></div><div class="arrow">&rarr;</div><div class="in"><span class="pname">White</span><span class="tm">ARS</span><div class="sub">£5.5 · 27 pts projected</div></div><div class="gain">+15</div></div>
+<div class="row"><div class="out"><span class="pname">Kinsky</span><span class="tm">TOT</span><div class="sub">£4.5 · 14 pts projected</div></div><div class="arrow">&rarr;</div><div class="in"><span class="pname">Rogers</span><span class="tm">CHE</span><div class="sub">£7.5 · 27 pts projected</div></div><div class="gain">+13</div></div>
+<div class="row"><div class="out"><span class="pname">Tzolis</span><span class="tm">ARS</span><div class="sub">£6.5 · 15 pts projected</div></div><div class="arrow">&rarr;</div><div class="in"><span class="pname">Gakpo</span><span class="tm">LIV</span><div class="sub">£7.1 · 26 pts projected</div></div><div class="gain">+10</div></div>
+<div class="row"><div class="out"><span class="pname">Maguire</span><span class="tm">MUN</span><div class="sub">£5.0 · 16 pts projected</div></div><div class="arrow">&rarr;</div><div class="in"><span class="pname">Barry</span><span class="tm">EVE</span><div class="sub">£5.5 · 26 pts projected</div></div><div class="gain">+10</div></div>
+<div class="row"><div class="out"><span class="pname">Ajer</span><span class="tm">BRE</span><div class="sub">£4.5 · 16 pts projected</div></div><div class="arrow">&rarr;</div><div class="in"><span class="pname">Wissa</span><span class="tm">NEW</span><div class="sub">£6.1 · 26 pts projected</div></div><div class="gain">+10</div></div>
+<div class="row"><div class="out"><span class="pname">Schade</span><span class="tm">BRE</span><div class="sub">£6.0 · 20 pts projected</div></div><div class="arrow">&rarr;</div><div class="in"><span class="pname">Hall</span><span class="tm">NEW</span><div class="sub">£5.1 · 25 pts projected</div></div><div class="gain">+5</div></div>
+<div class="row"><div class="out"><span class="pname">Calvert-Lewin</span><span class="tm">LEE</span><div class="sub">£6.0 · 23 pts projected</div></div><div class="arrow">&rarr;</div><div class="in"><span class="pname">Tzolakis</span><span class="tm">HUL</span><div class="sub">£4.6 · 24 pts projected</div></div><div class="gain">+2</div></div>
+<div class="row"><div class="out"><span class="pname">Szoboszlai</span><span class="tm">LIV</span><div class="sub">£7.0 · 25 pts projected</div></div><div class="arrow">&rarr;</div><div class="in"><span class="pname">Trafford</span><span class="tm">LEE</span><div class="sub">£5.0 · 21 pts projected</div></div><div class="gain">-3</div></div>
+<div class="row"><div class="out"><span class="pname">João Pedro</span><span class="tm">CHE</span><div class="sub">£7.7 · 25 pts projected</div></div><div class="arrow">&rarr;</div><div class="in"><span class="pname">De Cuyper</span><span class="tm">BHA</span><div class="sub">£4.7 · 20 pts projected</div></div><div class="gain">-5</div></div>
+<div class="row"><div class="out"><span class="pname">B.Fernandes</span><span class="tm">MUN</span><div class="sub">£12.0 · 38 pts projected</div></div><div class="arrow">&rarr;</div><div class="in"><span class="pname">Lewis-Potter</span><span class="tm">BRE</span><div class="sub">£5.5 · 20 pts projected</div></div><div class="gain">-18</div></div>
+</div>
+<p class="note">This is a draft, not a lock. The optimiser slightly overfits its own projections, so treat the shape &mdash; a heavy Arsenal defence, a premium mid, cheap enablers &mdash; as the instruction, and swap individuals you have a strong read on.</p>
+</section>
+<section><div class="shead"><h2>Fixture swing, GW4&ndash;8</h2>
+<p>Every club, by modelled expected goals. Switch the scale to read it from a defender&rsquo;s side.</p></div>
+<div class="legend"><button class="tg" data-view="att" aria-pressed="true">Attack</button><button class="tg" data-view="def" aria-pressed="false">Defence</button><span style="margin-left:6px">Hostile</span><span class="ramp"><i style="background:color-mix(in oklab,var(--bad-fill) 100%,var(--mid-fill))"></i><i style="background:color-mix(in oklab,var(--bad-fill) 55%,var(--mid-fill))"></i><i style="background:var(--mid-fill)"></i><i style="background:color-mix(in oklab,var(--good-fill) 55%,var(--mid-fill))"></i><i style="background:color-mix(in oklab,var(--good-fill) 100%,var(--mid-fill))"></i></span><span>Favourable</span></div>
+<div class="tw"><table class="grid"><thead><tr><th>Club</th>
+<th class="gw">GW4</th>
+<th class="gw">GW5</th>
+<th class="gw">GW6</th>
+<th class="gw">GW7</th>
+<th class="gw">GW8</th>
+<th class="n">xGF/g</th><th class="n">xGA/g</th></tr></thead><tbody>
+<tr><td><span class="pname">MCI</span></td>
+<td><span class="hc good" data-att="0.452" data-def="-0.229" style="--t:0.452">MUN<small>A &amp;middot; 2.1</small></span></td>
+<td><span class="hc good" data-att="1.000" data-def="0.762" style="--t:1.000">SUN<small>H &amp;middot; 3.7</small></span></td>
+<td><span class="hc good" data-att="0.348" data-def="-0.210" style="--t:0.348">LIV<small>A &amp;middot; 1.9</small></span></td>
+<td><span class="hc good" data-att="1.000" data-def="0.676" style="--t:1.000">IPS<small>H &amp;middot; 4.2</small></span></td>
+<td><span class="hc good" data-att="1.000" data-def="0.743" style="--t:1.000">AVL<small>A &amp;middot; 2.9</small></span></td>
+<td class="n">2.96</td><td class="n">1.18</td></tr>
+<tr><td><span class="pname">MUN</span></td>
+<td><span class="hc good" data-att="0.209" data-def="-0.495" style="--t:0.209">MCI<small>H &amp;middot; 1.8</small></span></td>
+<td><span class="hc good" data-att="1.000" data-def="0.457" style="--t:1.000">FUL<small>A &amp;middot; 2.8</small></span></td>
+<td><span class="hc good" data-att="1.000" data-def="0.505" style="--t:1.000">TOT<small>H &amp;middot; 2.8</small></span></td>
+<td><span class="hc good" data-att="0.635" data-def="0.457" style="--t:0.635">LEE<small>A &amp;middot; 2.3</small></span></td>
+<td><span class="hc good" data-att="1.000" data-def="0.467" style="--t:1.000">BOU<small>H &amp;middot; 3.0</small></span></td>
+<td class="n">2.54</td><td class="n">1.26</td></tr>
+<tr><td><span class="pname">LIV</span></td>
+<td><span class="hc good" data-att="1.000" data-def="0.705" style="--t:1.000">FUL<small>H &amp;middot; 3.5</small></span></td>
+<td><span class="hc good" data-att="0.722" data-def="0.286" style="--t:0.722">BOU<small>A &amp;middot; 2.4</small></span></td>
+<td><span class="hc good" data-att="0.191" data-def="-0.381" style="--t:0.191">MCI<small>H &amp;middot; 1.8</small></span></td>
+<td><span class="hc good" data-att="0.383" data-def="0.057" style="--t:0.383">BRE<small>A &amp;middot; 2.0</small></span></td>
+<td><span class="hc good" data-att="1.000" data-def="0.419" style="--t:1.000">BHA<small>H &amp;middot; 3.0</small></span></td>
+<td class="n">2.53</td><td class="n">1.32</td></tr>
+<tr><td><span class="pname">CHE</span></td>
+<td><span class="hc good" data-att="1.000" data-def="0.743" style="--t:1.000">HUL<small>H &amp;middot; 3.0</small></span></td>
+<td><span class="hc good" data-att="0.165" data-def="-0.067" style="--t:0.165">BRE<small>A &amp;middot; 1.7</small></span></td>
+<td><span class="hc good" data-att="0.930" data-def="0.438" style="--t:0.930">BOU<small>H &amp;middot; 2.6</small></span></td>
+<td><span class="hc good" data-att="0.522" data-def="0.229" style="--t:0.522">EVE<small>A &amp;middot; 2.1</small></span></td>
+<td><span class="hc good" data-att="0.757" data-def="0.476" style="--t:0.757">TOT<small>H &amp;middot; 2.4</small></span></td>
+<td class="n">2.39</td><td class="n">1.17</td></tr>
+<tr><td><span class="pname">ARS</span></td>
+<td><span class="hc good" data-att="0.626" data-def="0.857" style="--t:0.626">SUN<small>A &amp;middot; 2.3</small></span></td>
+<td><span class="hc good" data-att="0.574" data-def="0.676" style="--t:0.574">BHA<small>A &amp;middot; 2.2</small></span></td>
+<td><span class="hc good" data-att="0.957" data-def="1.000" style="--t:0.957">LEE<small>H &amp;middot; 2.6</small></span></td>
+<td><span class="hc good" data-att="0.287" data-def="0.733" style="--t:0.287">NFO<small>A &amp;middot; 1.9</small></span></td>
+<td><span class="hc good" data-att="1.000" data-def="0.924" style="--t:1.000">EVE<small>H &amp;middot; 2.9</small></span></td>
+<td class="n">2.38</td><td class="n">0.67</td></tr>
+<tr><td><span class="pname">BRE</span></td>
+<td><span class="hc good" data-att="0.165" data-def="0.019" style="--t:0.165">BOU<small>A &amp;middot; 1.7</small></span></td>
+<td><span class="hc good" data-att="0.061" data-def="-0.181" style="--t:0.061">CHE<small>H &amp;middot; 1.6</small></span></td>
+<td><span class="hc good" data-att="0.200" data-def="0.448" style="--t:0.200">AVL<small>A &amp;middot; 1.8</small></span></td>
+<td><span class="hc bad" data-att="-0.052" data-def="-0.419" style="--t:0.052">LIV<small>H &amp;middot; 1.5</small></span></td>
+<td><span class="hc good" data-att="0.391" data-def="0.448" style="--t:0.391">HUL<small>A &amp;middot; 2.0</small></span></td>
+<td class="n">1.73</td><td class="n">1.48</td></tr>
+<tr><td><span class="pname">NEW</span></td>
+<td><span class="hc bad" data-att="-0.243" data-def="0.038" style="--t:0.243">LEE<small>A &amp;middot; 1.3</small></span></td>
+<td><span class="hc good" data-att="0.339" data-def="0.467" style="--t:0.339">HUL<small>H &amp;middot; 1.9</small></span></td>
+<td><span class="hc bad" data-att="-0.122" data-def="0.229" style="--t:0.122">COV<small>A &amp;middot; 1.4</small></span></td>
+<td><span class="hc good" data-att="0.148" data-def="0.467" style="--t:0.148">AVL<small>H &amp;middot; 1.7</small></span></td>
+<td><span class="hc bad" data-att="-0.148" data-def="-0.095" style="--t:0.148">CRY<small>A &amp;middot; 1.4</small></span></td>
+<td class="n">1.54</td><td class="n">1.32</td></tr>
+<tr><td><span class="pname">NFO</span></td>
+<td><span class="hc bad" data-att="-0.009" data-def="0.438" style="--t:0.009">AVL<small>A &amp;middot; 1.5</small></span></td>
+<td><span class="hc good" data-att="0.383" data-def="0.657" style="--t:0.383">COV<small>H &amp;middot; 2.0</small></span></td>
+<td><span class="hc bad" data-att="-0.009" data-def="0.190" style="--t:0.009">CRY<small>A &amp;middot; 1.5</small></span></td>
+<td><span class="hc bad" data-att="-0.670" data-def="-0.314" style="--t:0.670">ARS<small>H &amp;middot; 0.8</small></span></td>
+<td><span class="hc good" data-att="0.191" data-def="0.048" style="--t:0.191">IPS<small>A &amp;middot; 1.8</small></span></td>
+<td class="n">1.52</td><td class="n">1.34</td></tr>
+<tr><td><span class="pname">TOT</span></td>
+<td><span class="hc good" data-att="0.243" data-def="0.248" style="--t:0.243">EVE<small>H &amp;middot; 1.8</small></span></td>
+<td><span class="hc good" data-att="0.235" data-def="0.571" style="--t:0.235">AVL<small>H &amp;middot; 1.8</small></span></td>
+<td><span class="hc bad" data-att="-0.461" data-def="-1.000" style="--t:0.461">MUN<small>A &amp;middot; 1.0</small></span></td>
+<td><span class="hc good" data-att="0.278" data-def="0.581" style="--t:0.278">COV<small>H &amp;middot; 1.9</small></span></td>
+<td><span class="hc bad" data-att="-0.435" data-def="-0.829" style="--t:0.435">CHE<small>A &amp;middot; 1.1</small></span></td>
+<td class="n">1.52</td><td class="n">1.68</td></tr>
+<tr><td><span class="pname">BHA</span></td>
+<td><span class="hc good" data-att="0.148" data-def="0.267" style="--t:0.148">COV<small>A &amp;middot; 1.7</small></span></td>
+<td><span class="hc bad" data-att="-0.617" data-def="-0.629" style="--t:0.617">ARS<small>H &amp;middot; 0.8</small></span></td>
+<td><span class="hc good" data-att="0.104" data-def="-0.019" style="--t:0.104">SUN<small>A &amp;middot; 1.7</small></span></td>
+<td><span class="hc good" data-att="0.487" data-def="0.267" style="--t:0.487">CRY<small>H &amp;middot; 2.1</small></span></td>
+<td><span class="hc bad" data-att="-0.383" data-def="-1.000" style="--t:0.383">LIV<small>A &amp;middot; 1.1</small></span></td>
+<td class="n">1.49</td><td class="n">1.86</td></tr>
+<tr><td><span class="pname">CRY</span></td>
+<td><span class="hc good" data-att="0.296" data-def="0.086" style="--t:0.296">IPS<small>H &amp;middot; 1.9</small></span></td>
+<td><span class="hc bad" data-att="-0.287" data-def="0.038" style="--t:0.287">LEE<small>A &amp;middot; 1.2</small></span></td>
+<td><span class="hc bad" data-att="-0.174" data-def="0.010" style="--t:0.174">NFO<small>H &amp;middot; 1.4</small></span></td>
+<td><span class="hc bad" data-att="-0.243" data-def="-0.533" style="--t:0.243">BHA<small>A &amp;middot; 1.3</small></span></td>
+<td><span class="hc good" data-att="0.087" data-def="0.162" style="--t:0.087">NEW<small>H &amp;middot; 1.6</small></span></td>
+<td class="n">1.48</td><td class="n">1.60</td></tr>
+<tr><td><span class="pname">IPS</span></td>
+<td><span class="hc bad" data-att="-0.078" data-def="-0.324" style="--t:0.078">CRY<small>A &amp;middot; 1.5</small></span></td>
+<td><span class="hc bad" data-att="-0.070" data-def="-0.505" style="--t:0.070">EVE<small>A &amp;middot; 1.5</small></span></td>
+<td><span class="hc good" data-att="0.478" data-def="0.152" style="--t:0.478">FUL<small>H &amp;middot; 2.1</small></span></td>
+<td><span class="hc bad" data-att="-0.617" data-def="-1.000" style="--t:0.617">MCI<small>A &amp;middot; 0.8</small></span></td>
+<td><span class="hc bad" data-att="-0.043" data-def="-0.210" style="--t:0.043">NFO<small>H &amp;middot; 1.5</small></span></td>
+<td class="n">1.48</td><td class="n">2.27</td></tr>
+<tr><td><span class="pname">EVE</span></td>
+<td><span class="hc bad" data-att="-0.226" data-def="-0.267" style="--t:0.226">TOT<small>A &amp;middot; 1.3</small></span></td>
+<td><span class="hc good" data-att="0.461" data-def="0.076" style="--t:0.461">IPS<small>H &amp;middot; 2.1</small></span></td>
+<td><span class="hc good" data-att="0.061" data-def="0.210" style="--t:0.061">HUL<small>A &amp;middot; 1.6</small></span></td>
+<td><span class="hc bad" data-att="-0.209" data-def="-0.571" style="--t:0.209">CHE<small>H &amp;middot; 1.3</small></span></td>
+<td><span class="hc bad" data-att="-0.843" data-def="-1.000" style="--t:0.843">ARS<small>A &amp;middot; 0.6</small></span></td>
+<td class="n">1.38</td><td class="n">1.93</td></tr>
+<tr><td><span class="pname">BOU</span></td>
+<td><span class="hc bad" data-att="-0.017" data-def="-0.181" style="--t:0.017">BRE<small>H &amp;middot; 1.5</small></span></td>
+<td><span class="hc bad" data-att="-0.261" data-def="-0.790" style="--t:0.261">LIV<small>H &amp;middot; 1.2</small></span></td>
+<td><span class="hc bad" data-att="-0.400" data-def="-1.000" style="--t:0.400">CHE<small>A &amp;middot; 1.1</small></span></td>
+<td><span class="hc good" data-att="0.278" data-def="0.276" style="--t:0.278">SUN<small>H &amp;middot; 1.9</small></span></td>
+<td><span class="hc bad" data-att="-0.426" data-def="-1.000" style="--t:0.426">MUN<small>A &amp;middot; 1.1</small></span></td>
+<td class="n">1.36</td><td class="n">2.20</td></tr>
+<tr><td><span class="pname">FUL</span></td>
+<td><span class="hc bad" data-att="-0.643" data-def="-1.000" style="--t:0.643">LIV<small>A &amp;middot; 0.8</small></span></td>
+<td><span class="hc bad" data-att="-0.417" data-def="-1.000" style="--t:0.417">MUN<small>H &amp;middot; 1.1</small></span></td>
+<td><span class="hc bad" data-att="-0.139" data-def="-0.524" style="--t:0.139">IPS<small>A &amp;middot; 1.4</small></span></td>
+<td><span class="hc good" data-att="0.139" data-def="0.314" style="--t:0.139">HUL<small>H &amp;middot; 1.7</small></span></td>
+<td><span class="hc bad" data-att="-0.261" data-def="0.038" style="--t:0.261">COV<small>A &amp;middot; 1.2</small></span></td>
+<td class="n">1.25</td><td class="n">2.24</td></tr>
+<tr><td><span class="pname">COV</span></td>
+<td><span class="hc bad" data-att="-0.243" data-def="-0.162" style="--t:0.243">BHA<small>H &amp;middot; 1.3</small></span></td>
+<td><span class="hc bad" data-att="-0.600" data-def="-0.419" style="--t:0.600">NFO<small>A &amp;middot; 0.9</small></span></td>
+<td><span class="hc bad" data-att="-0.209" data-def="0.133" style="--t:0.209">NEW<small>H &amp;middot; 1.3</small></span></td>
+<td><span class="hc bad" data-att="-0.530" data-def="-0.305" style="--t:0.530">TOT<small>A &amp;middot; 0.9</small></span></td>
+<td><span class="hc bad" data-att="-0.035" data-def="0.286" style="--t:0.035">FUL<small>H &amp;middot; 1.5</small></span></td>
+<td class="n">1.18</td><td class="n">1.65</td></tr>
+<tr><td><span class="pname">LEE</span></td>
+<td><span class="hc bad" data-att="-0.035" data-def="0.267" style="--t:0.035">NEW<small>H &amp;middot; 1.5</small></span></td>
+<td><span class="hc bad" data-att="-0.035" data-def="0.314" style="--t:0.035">CRY<small>H &amp;middot; 1.5</small></span></td>
+<td><span class="hc bad" data-att="-0.930" data-def="-1.000" style="--t:0.930">ARS<small>A &amp;middot; 0.5</small></span></td>
+<td><span class="hc bad" data-att="-0.417" data-def="-0.695" style="--t:0.417">MUN<small>H &amp;middot; 1.1</small></span></td>
+<td><span class="hc bad" data-att="-0.304" data-def="0.048" style="--t:0.304">SUN<small>A &amp;middot; 1.2</small></span></td>
+<td class="n">1.15</td><td class="n">1.78</td></tr>
+<tr><td><span class="pname">SUN</span></td>
+<td><span class="hc bad" data-att="-0.783" data-def="-0.686" style="--t:0.783">ARS<small>H &amp;middot; 0.7</small></span></td>
+<td><span class="hc bad" data-att="-0.696" data-def="-1.000" style="--t:0.696">MCI<small>A &amp;middot; 0.8</small></span></td>
+<td><span class="hc good" data-att="0.017" data-def="-0.114" style="--t:0.017">BHA<small>H &amp;middot; 1.6</small></span></td>
+<td><span class="hc bad" data-att="-0.252" data-def="-0.305" style="--t:0.252">BOU<small>A &amp;middot; 1.3</small></span></td>
+<td><span class="hc bad" data-att="-0.043" data-def="0.333" style="--t:0.043">LEE<small>H &amp;middot; 1.5</small></span></td>
+<td class="n">1.14</td><td class="n">2.14</td></tr>
+<tr><td><span class="pname">HUL</span></td>
+<td><span class="hc bad" data-att="-0.678" data-def="-1.000" style="--t:0.678">CHE<small>A &amp;middot; 0.8</small></span></td>
+<td><span class="hc bad" data-att="-0.426" data-def="-0.371" style="--t:0.426">NEW<small>A &amp;middot; 1.1</small></span></td>
+<td><span class="hc bad" data-att="-0.191" data-def="-0.067" style="--t:0.191">EVE<small>H &amp;middot; 1.3</small></span></td>
+<td><span class="hc bad" data-att="-0.287" data-def="-0.152" style="--t:0.287">FUL<small>A &amp;middot; 1.2</small></span></td>
+<td><span class="hc bad" data-att="-0.409" data-def="-0.429" style="--t:0.409">BRE<small>H &amp;middot; 1.1</small></span></td>
+<td class="n">1.09</td><td class="n">2.06</td></tr>
+<tr><td><span class="pname">AVL</span></td>
+<td><span class="hc bad" data-att="-0.400" data-def="0.010" style="--t:0.400">NFO<small>H &amp;middot; 1.1</small></span></td>
+<td><span class="hc bad" data-att="-0.522" data-def="-0.257" style="--t:0.522">TOT<small>A &amp;middot; 0.9</small></span></td>
+<td><span class="hc bad" data-att="-0.409" data-def="-0.219" style="--t:0.409">BRE<small>H &amp;middot; 1.1</small></span></td>
+<td><span class="hc bad" data-att="-0.426" data-def="-0.162" style="--t:0.426">NEW<small>A &amp;middot; 1.1</small></span></td>
+<td><span class="hc bad" data-att="-0.678" data-def="-1.000" style="--t:0.678">MCI<small>H &amp;middot; 0.8</small></span></td>
+<td class="n">0.99</td><td class="n">1.95</td></tr>
+</tbody></table></div></section>
+<section><div class="shead"><h2>Transfer targets by position</h2><p>Ranked on projected points across the window, not on last week&rsquo;s haul.</p></div>
+<div class="cols">
+<div class="tw"><table><thead><tr><th>GK</th><th class="n">&pound;</th><th class="n">5GW</th><th class="n">Own</th></tr></thead><tbody>
+<tr><td><span class="pname">Tzolakis</span><span class="tm">HUL</span></td><td class="n">4.6</td><td class="n">24.2</td><td class="n">8%</td></tr>
+<tr><td><span class="pname">Trafford</span><span class="tm">LEE</span></td><td class="n">5.0</td><td class="n">21.1</td><td class="n">5%</td></tr>
+<tr><td><span class="pname">Raya</span><span class="tm">ARS</span></td><td class="n">6.0</td><td class="n">19.0</td><td class="n">38%</td></tr>
+<tr><td><span class="pname">Kelleher</span><span class="tm">BRE</span></td><td class="n">5.0</td><td class="n">17.3</td><td class="n">7%</td></tr>
+<tr><td><span class="pname">Sels</span><span class="tm">NFO</span></td><td class="n">5.0</td><td class="n">16.2</td><td class="n">1%</td></tr>
+<tr><td><span class="pname">Lammens</span><span class="tm">MUN</span></td><td class="n">5.0</td><td class="n">16.1</td><td class="n">14%</td></tr>
+<tr><td><span class="pname">Petrović</span><span class="tm">BOU</span></td><td class="n">4.5</td><td class="n">16.0</td><td class="n">3%</td></tr>
+<tr><td><span class="pname">Henderson</span><span class="tm">CRY</span></td><td class="n">5.0</td><td class="n">16.0</td><td class="n">2%</td></tr>
+</tbody></table></div>
+<div class="tw"><table><thead><tr><th>DEF</th><th class="n">&pound;</th><th class="n">5GW</th><th class="n">Own</th></tr></thead><tbody>
+<tr><td><span class="pname">Guéhi</span><span class="tm">MCI</span></td><td class="n">6.0</td><td class="n">28.4</td><td class="n">19%</td></tr>
+<tr><td><span class="pname">White</span><span class="tm">ARS</span></td><td class="n">5.5</td><td class="n">27.0</td><td class="n">8%</td></tr>
+<tr><td><span class="pname">Calafiori</span><span class="tm">ARS</span></td><td class="n">5.7</td><td class="n">26.4</td><td class="n">46%</td></tr>
+<tr><td><span class="pname">Hall</span><span class="tm">NEW</span></td><td class="n">5.1</td><td class="n">25.1</td><td class="n">10%</td></tr>
+<tr><td><span class="pname">Gabriel</span><span class="tm">ARS</span></td><td class="n">8.0</td><td class="n">21.1</td><td class="n">26%</td></tr>
+<tr><td><span class="pname">De Cuyper</span><span class="tm">BHA</span></td><td class="n">4.7</td><td class="n">20.2</td><td class="n">17%</td></tr>
+<tr><td><span class="pname">Rúben</span><span class="tm">MCI</span></td><td class="n">5.5</td><td class="n">20.0</td><td class="n">2%</td></tr>
+<tr><td><span class="pname">Lacroix</span><span class="tm">CHE</span></td><td class="n">6.0</td><td class="n">19.6</td><td class="n">8%</td></tr>
+</tbody></table></div>
+<div class="tw"><table><thead><tr><th>MID</th><th class="n">&pound;</th><th class="n">5GW</th><th class="n">Own</th></tr></thead><tbody>
+<tr><td><span class="pname">Saka</span><span class="tm">ARS</span></td><td class="n">9.5</td><td class="n">43.6</td><td class="n">11%</td></tr>
+<tr><td><span class="pname">B.Fernandes</span><span class="tm">MUN</span></td><td class="n">12.0</td><td class="n">38.3</td><td class="n">49%</td></tr>
+<tr><td><span class="pname">Palmer</span><span class="tm">CHE</span></td><td class="n">9.6</td><td class="n">29.5</td><td class="n">19%</td></tr>
+<tr><td><span class="pname">Foden</span><span class="tm">MCI</span></td><td class="n">7.0</td><td class="n">28.5</td><td class="n">6%</td></tr>
+<tr><td><span class="pname">Mbeumo</span><span class="tm">MUN</span></td><td class="n">7.9</td><td class="n">27.3</td><td class="n">27%</td></tr>
+<tr><td><span class="pname">Gibbs-White</span><span class="tm">NFO</span></td><td class="n">7.9</td><td class="n">27.0</td><td class="n">9%</td></tr>
+<tr><td><span class="pname">Rogers</span><span class="tm">CHE</span></td><td class="n">7.5</td><td class="n">26.9</td><td class="n">25%</td></tr>
+<tr><td><span class="pname">Gakpo</span><span class="tm">LIV</span></td><td class="n">7.1</td><td class="n">25.8</td><td class="n">9%</td></tr>
+</tbody></table></div>
+<div class="tw"><table><thead><tr><th>FWD</th><th class="n">&pound;</th><th class="n">5GW</th><th class="n">Own</th></tr></thead><tbody>
+<tr><td><span class="pname">Haaland</span><span class="tm">MCI</span></td><td class="n">15.5</td><td class="n">31.0</td><td class="n">71%</td></tr>
+<tr><td><span class="pname">Isak</span><span class="tm">LIV</span></td><td class="n">9.0</td><td class="n">30.8</td><td class="n">17%</td></tr>
+<tr><td><span class="pname">Barry</span><span class="tm">EVE</span></td><td class="n">5.5</td><td class="n">25.5</td><td class="n">5%</td></tr>
+<tr><td><span class="pname">Wissa</span><span class="tm">NEW</span></td><td class="n">6.1</td><td class="n">25.5</td><td class="n">16%</td></tr>
+<tr><td><span class="pname">João Pedro</span><span class="tm">CHE</span></td><td class="n">7.7</td><td class="n">25.0</td><td class="n">71%</td></tr>
+<tr><td><span class="pname">Calvert-Lewin</span><span class="tm">LEE</span></td><td class="n">6.0</td><td class="n">22.6</td><td class="n">26%</td></tr>
+<tr><td><span class="pname">Thiago</span><span class="tm">BRE</span></td><td class="n">8.0</td><td class="n">21.3</td><td class="n">14%</td></tr>
+<tr><td><span class="pname">Nketiah</span><span class="tm">CRY</span></td><td class="n">5.5</td><td class="n">20.9</td><td class="n">0%</td></tr>
+</tbody></table></div>
+</div></section>
+<div class="cols">
+<section><div class="shead"><h2>Differentials</h2><p>Under 8% owned.</p></div>
+<div class="tw"><table><thead><tr><th>Player</th><th class="n">&pound;</th><th class="n">5GW</th><th class="n">Own</th></tr></thead><tbody>
+<tr><td><span class="pname">Foden</span><span class="tm">MCI</span> <span class="pos">MID</span></td><td class="n">7.0</td><td class="n">28.5</td><td class="n">5.8%</td></tr>
+<tr><td><span class="pname">White</span><span class="tm">ARS</span> <span class="pos">DEF</span></td><td class="n">5.5</td><td class="n">27.0</td><td class="n">7.6%</td></tr>
+<tr><td><span class="pname">Barry</span><span class="tm">EVE</span> <span class="pos">FWD</span></td><td class="n">5.5</td><td class="n">25.5</td><td class="n">4.9%</td></tr>
+<tr><td><span class="pname">Tzolakis</span><span class="tm">HUL</span> <span class="pos">GK</span></td><td class="n">4.6</td><td class="n">24.2</td><td class="n">7.8%</td></tr>
+<tr><td><span class="pname">Stach</span><span class="tm">LEE</span> <span class="pos">MID</span></td><td class="n">6.0</td><td class="n">22.6</td><td class="n">3.0%</td></tr>
+<tr><td><span class="pname">Trafford</span><span class="tm">LEE</span> <span class="pos">GK</span></td><td class="n">5.0</td><td class="n">21.1</td><td class="n">5.1%</td></tr>
+<tr><td><span class="pname">Nketiah</span><span class="tm">CRY</span> <span class="pos">FWD</span></td><td class="n">5.5</td><td class="n">20.9</td><td class="n">0.5%</td></tr>
+<tr><td><span class="pname">Gonzalo</span><span class="tm">FUL</span> <span class="pos">FWD</span></td><td class="n">6.0</td><td class="n">20.8</td><td class="n">4.6%</td></tr>
+<tr><td><span class="pname">Emersonn</span><span class="tm">IPS</span> <span class="pos">FWD</span></td><td class="n">5.5</td><td class="n">20.2</td><td class="n">1.7%</td></tr>
+<tr><td><span class="pname">Lewis-Potter</span><span class="tm">BRE</span> <span class="pos">MID</span></td><td class="n">5.5</td><td class="n">20.1</td><td class="n">2.2%</td></tr>
+</tbody></table></div></section>
+<section><div class="shead"><h2>Availability watchlist</h2><p>Live from the FPL feed.</p></div>
+<div class="tw"><table><thead><tr><th>Player</th><th>Note</th></tr></thead><tbody>
+<tr><td><span class="pname">Mosquera</span><span class="tm">ARS</span></td><td><span class="pill warn">Doubt</span> Unspecified injury - 75% chance of playing</td></tr>
+<tr><td><span class="pname">Watkins</span><span class="tm">AVL</span></td><td><span class="pill out">Out</span> Has joined Al Hilal permanently</td></tr>
+<tr><td><span class="pname">Rodon</span><span class="tm">LEE</span></td><td><span class="pill out">Out</span> Hamstring injury - Expected back 21 Nov</td></tr>
+</tbody></table></div></section>
+</div>
+<footer><span class="eyebrow">How these numbers are made</span>
+<p class="note">Team attack and defence ratings come from this season&rsquo;s expected goals, shrunk toward a squad-market-value prior &mdash; after only 2 rounds the raw numbers are far too noisy to trust on their own. Those ratings feed a Poisson fixture model that produces expected goals for and against in every remaining fixture, which in turn drives clean-sheet odds, attacking returns (scaled by each player&rsquo;s expected goal involvement per 90, itself shrunk toward a price-and-position baseline), defensive-contribution points, save points and bonus. Availability is taken live from the official feed. Re-run <code>py update.py</code> after each deadline and this page rewrites itself.</p>
+</footer></div>
+<script>
+(function(){
+  var btns=document.querySelectorAll('[data-view]');
+  function apply(mode){
+    document.querySelectorAll('.hc[data-att]').forEach(function(c){
+      var v=parseFloat(c.dataset[mode]);
+      c.classList.toggle('good', v>0); c.classList.toggle('bad', v<0);
+      c.style.setProperty('--t', Math.min(Math.abs(v),1).toFixed(3));
+    });
+    btns.forEach(function(b){ b.setAttribute('aria-pressed', String(b.dataset.view===mode)); });
+  }
+  btns.forEach(function(b){ b.addEventListener('click',function(){ apply(b.dataset.view); }); });
+})();
+</script>

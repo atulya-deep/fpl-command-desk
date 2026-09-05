@@ -1,0 +1,6 @@
+# cached API responses - re-downloaded on every run
+data/
+
+# python
+__pycache__/
+*.pyc
