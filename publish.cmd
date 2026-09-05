@@ -32,6 +32,13 @@ if errorlevel 1 (
   exit /b 1
 )
 
+REM The scheduled GitHub Action also commits here, so reconcile before pushing.
+git pull --rebase origin main
+if errorlevel 1 (
+  echo [publish] rebase failed - resolve by hand, then run publish.cmd again
+  exit /b 1
+)
+
 git push origin HEAD
 if errorlevel 1 (
   echo [publish] push failed - run "gh auth login" or check your remote

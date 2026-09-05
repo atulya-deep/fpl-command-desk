@@ -1,0 +1,42 @@
+name: Weekly dashboard refresh
+
+on:
+  schedule:
+    # 08:00 UTC every Wednesday. Cron here is always UTC, never local time.
+    - cron: "0 8 * * 3"
+  workflow_dispatch:        # lets you trigger a run by hand from the Actions tab
+
+permissions:
+  contents: write
+
+concurrency:
+  group: dashboard-refresh
+  cancel-in-progress: false
+
+jobs:
+  refresh:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Check out the repo
+        uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+
+      - name: Rebuild the dashboard from live FPL data
+        run: python update.py
+
+      - name: Commit and publish if anything changed
+        run: |
+          git config user.name  "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          if git diff --quiet -- dashboard.html index.html history; then
+            echo "No change in the projections - nothing to publish."
+            exit 0
+          fi
+          git add dashboard.html index.html history
+          git commit -m "Dashboard refresh $(date -u '+%Y-%m-%d')"
+          git push
+          echo "Published. Pages will rebuild shortly."
