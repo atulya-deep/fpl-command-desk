@@ -44,6 +44,51 @@ schtasks /create /tn "FPL Weekly Refresh" /tr "C:\Users\Abcom\Downloads\FPL\refr
 If the machine is asleep at 09:00 the task is skipped rather than queued; just
 double-click `refresh.cmd` when you next sit down.
 
+After each refresh, `refresh.cmd` calls `publish.cmd`, which commits and pushes
+the rebuilt page. Until an `origin` remote exists it skips that step quietly, so
+the weekly task works whether or not GitHub is set up.
+
+## Put it on GitHub Pages
+
+The repo is already initialised and committed. Three steps, all of which need
+your own GitHub login:
+
+```powershell
+winget install --id GitHub.cli -e
+```
+
+Restart the terminal so `gh` is on PATH, then:
+
+```powershell
+gh auth login
+```
+
+```powershell
+gh repo create fpl-command-desk --public --source=. --remote=origin --push
+```
+
+Then turn Pages on — either in **Settings → Pages → Source: `main`, `/ (root)`**,
+or from the CLI:
+
+```powershell
+gh api --method POST repos/{owner}/fpl-command-desk/pages -f "source[branch]=main" -f "source[path]=/"
+```
+
+The site lands at `https://<your-username>.github.io/fpl-command-desk/`, serving
+`index.html` — which `update.py` rewrites alongside `dashboard.html` on every
+run. From then on the Wednesday task refreshes the data, commits, and pushes,
+and Pages rebuilds within a minute or so. The live site keeps itself current
+with no further input.
+
+### Before you make it public
+
+GitHub Pages needs a **public** repo on a free account, and the published page
+shows your squad, your manager name and your transfer plan. FPL team names and
+ids are already public on the game's own leaderboards, so this leaks nothing new
+— but it does mean your weekly strategy is readable by anyone with the link. If
+you would rather it stay private, keep using the Claude artifact instead, or put
+the repo on a paid plan where Pages can serve from a private repo.
+
 ## Connect your live squad
 
 Put your FPL team id in `config.json` and the squad, bank and team value sync
