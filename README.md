@@ -161,31 +161,6 @@ A loaded squad is a snapshot - press *Load by ID* again after you make a
 transfer. For a team that stays current on its own, use `config.json` and the
 scheduled job.
 
-### The old note on team ids
-
-No FPL endpoint sends an `access-control-allow-origin` header - not
-`bootstrap-static`, not `entry`, not `picks` - so a browser refuses to read them
-from another site. Public CORS proxies were tried and rejected: `corsproxy.io`
-now answers 401 and `allorigins` failed outright, and routing your data through
-an unaccountable third party to save one paste is a bad trade.
-
-Navigation is not blocked, though. So *Open my team data* sends you to the real
-picks URL for the current gameweek, you copy what you see, and the page parses
-it locally. Nothing leaves your browser. The parser accepts the raw JSON, or
-text with the JSON somewhere inside it, and tells you plainly when the paste is
-the wrong endpoint, truncated, or empty.
-
-A pasted squad is a snapshot: paste again after you make a transfer. For a team
-that should stay current on its own, use `config.json` and the scheduled job.
-
-### The old note on team ids
-
-No FPL endpoint sends an `access-control-allow-origin` header — not
-`bootstrap-static`, not `entry`, not `picks`. A browser therefore cannot read
-anyone's team directly, and no purely client-side site can. Syncing a team has
-to happen server-side, which is what `config.json` plus the scheduled job does.
-The squad builder exists so that anyone else still gets a working tool.
-
 ## Your live squad
 
 `config.json` carries team id **7561127**, so squad, bank, team value and
