@@ -127,9 +127,10 @@ routes:
 
 - **Use the configured team** — squad, bank and value synced from FPL on the
   server every six hours. That is team 7561127 here.
-- **Add your team by ID** - load the real squad behind any FPL team number. You
-  enter the number, press *Open my team data*, and paste what the tab shows.
-  One copy and paste, because of the CORS limit below.
+- **Add your team by ID** - type the number, press *Load my team*. It pulls your
+  squad, your bank, how many free transfers you have banked and which chips you
+  have already played. If the relay is unreachable it reveals a manual
+  copy-and-paste route that always works.
 - **Build a new team** — pick fifteen players in the browser against the real
   £100.0m budget, the 2/5/5/3 shape and the three-per-club cap.
 
@@ -138,7 +139,29 @@ recomputes from it**: the rolling gameweek plan, the transfer search, the
 per-player grid, the simulation and the headline numbers. "Use a different team"
 in the header clears it and returns to the start screen.
 
-### Why loading a team needs a copy and paste
+### How loading by number works
+
+No FPL endpoint sends an `access-control-allow-origin` header - not
+`bootstrap-static`, not `entry`, not `picks` - so a browser cannot call them
+from another site. Of the public relays tried, only `r.jina.ai` is both alive
+and CORS-capable: `corsproxy.io` answers 403 without an account, and
+`allorigins`, `codetabs`, `thingproxy`, `cors.eu.org` and `cors.isomorphic-git`
+all failed outright.
+
+So *Load my team* fetches `entry/<id>/event/<gw>/picks/` and `entry/<id>/history/`
+through that relay and pulls the JSON back out of the text it returns. Only your
+team number travels, and it is already public on every league table you appear
+in. Nothing is stored anywhere but your own browser.
+
+The relay is a third party and can rate-limit or go down, so every failure
+reveals the manual route: open the picks URL yourself, copy it, paste it in.
+That path needs no third party and always works.
+
+A loaded squad is a snapshot - press *Load by ID* again after you make a
+transfer. For a team that stays current on its own, use `config.json` and the
+scheduled job.
+
+### The old note on team ids
 
 No FPL endpoint sends an `access-control-allow-origin` header - not
 `bootstrap-static`, not `entry`, not `picks` - so a browser refuses to read them

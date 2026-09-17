@@ -628,6 +628,27 @@
            (DATA.current_gw || 1) + "/picks/";
   }
 
+  function historyUrl(id) {
+    return "https://fantasy.premierleague.com/api/entry/" + id + "/history/";
+  }
+
+  // FPL sends no CORS header, so a direct fetch is impossible. This public
+  // read-only relay does send one; it returns the page as text with the JSON
+  // inside, so pull the outermost braces back out.
+  function viaRelay(url, ms) {
+    var ctl = new AbortController();
+    var timer = setTimeout(function () { ctl.abort(); }, ms || 15000);
+    return fetch("https://r.jina.ai/" + url, { signal: ctl.signal }).then(function (r) {
+      clearTimeout(timer);
+      if (!r.ok) throw new Error("relay returned " + r.status);
+      return r.text();
+    }).then(function (txt) {
+      var i = txt.indexOf("{"), j = txt.lastIndexOf("}");
+      if (i < 0 || j <= i) throw new Error("no data in relay response");
+      return JSON.parse(txt.slice(i, j + 1));
+    });
+  }
+
   function openById(fromApp) {
     var st = $("#startScreen"), bd = $("#builder"), by = $("#byId");
     if (st) st.hidden = false;
@@ -639,82 +660,137 @@
     var input = $("#tidInput"), link = $("#tidLink"), msg = $("#tidMsg");
     function syncLink() {
       var id = (input.value || "").replace(/[^0-9]/g, "");
-      if (id) {
-        link.href = picksUrl(id);
-        link.setAttribute("aria-disabled", "false");
-      } else {
-        link.href = "#";
-        link.setAttribute("aria-disabled", "true");
-      }
+      if (id) { link.href = picksUrl(id); link.setAttribute("aria-disabled", "false"); }
+      else { link.href = "#"; link.setAttribute("aria-disabled", "true"); }
     }
     input.oninput = syncLink;
     syncLink();
     input.focus();
+    input.onkeydown = function (e) { if (e.key === "Enter") { e.preventDefault(); autoLoad(); } };
 
+    $("#tidManualToggle").onclick = function () {
+      var m = $("#tidManual");
+      m.hidden = !m.hidden;
+      this.textContent = m.hidden ? "Paste it manually instead" : "Hide manual paste";
+      if (!m.hidden) m.scrollIntoView({ block: "nearest", behavior: "smooth" });
+    };
     $("#tidBack").onclick = function () {
       by.hidden = true;
       msg.className = "msg";
       if (state) { $("#startScreen").hidden = true; $("#appBody").hidden = false; }
     };
+    $("#tidFetch").onclick = autoLoad;
     $("#tidLoad").onclick = function () { loadPasted(input, msg); };
   }
 
+  function resetFetchUI() {
+    var b = $("#tidFetch");
+    if (b) { b.disabled = false; b.textContent = "Load my team"; }
+    document.body.classList.remove("busy");
+  }
+
+  function revealManual() {
+    var m = $("#tidManual");
+    if (m) { m.hidden = false; $("#tidManualToggle").textContent = "Hide manual paste"; }
+  }
+
   function say(msg, text, ok) {
+    if (!ok) resetFetchUI();
     msg.className = "msg show " + (ok ? "ok" : "err");
     msg.innerHTML = text;
+    msg.scrollIntoView({ block: "nearest", behavior: "smooth" });
+  }
+
+  function autoLoad() {
+    var input = $("#tidInput"), msg = $("#tidMsg"), btn = $("#tidFetch");
+    var id = (input.value || "").replace(/[^0-9]/g, "");
+    if (!id) return say(msg, "Put your team number in the box first.", false);
+
+    btn.disabled = true;
+    btn.textContent = "Loading\u2026";
+    document.body.classList.add("busy");
+    msg.className = "msg show ok";
+    msg.innerHTML = "Fetching squad for team <b>" + esc(id) + "</b>\u2026";
+
+    viaRelay(picksUrl(id), 16000).then(function (picks) {
+      // free transfers need the season history; it is a nice-to-have, not a gate
+      return viaRelay(historyUrl(id), 12000).then(function (h) {
+        var ft = 1;
+        (h.current || []).forEach(function (e) {
+          ft = Math.min(5, Math.max(0, ft - (e.event_transfers || 0)) + 1);
+        });
+        return { picks: picks, ft: ft, chips: (h.chips || []).map(function (c) { return c.name; }) };
+      }).catch(function () { return { picks: picks, ft: 1, chips: null }; });
+    }).then(function (res) {
+      applyTeam(res.picks, id, msg, res.ft, res.chips, "fetched");
+    }).catch(function (err) {
+      revealManual();
+      say(msg, "Could not reach the relay (" + esc(err.message) + "). This happens when it is rate " +
+               "limited or offline. Use the manual steps just below &mdash; they always work.", false);
+    });
+  }
+
+  function applyTeam(data, id, msg, ft, chips, how) {
+    var fetched = how === "fetched";
+    if (!data || !Array.isArray(data.picks) || !data.picks.length) {
+      if (fetched) {
+        revealManual();
+        return say(msg, "Team <b>" + esc(id) + "</b> came back without a squad. Check the number is " +
+                        "right &mdash; or load it manually below.", false);
+      }
+      return say(msg, "No squad found in that. It should contain a <code>picks</code> list.", false);
+    }
+    var ids = data.picks.map(function (x) { return x.element; });
+    if (ids.length !== 15) {
+      if (fetched) revealManual();
+      return say(msg, "Found " + ids.length + " players, expected 15.", false);
+    }
+    var missing = ids.filter(function (i) { return !P[i]; });
+    if (missing.length) {
+      return say(msg, missing.length + " of those players are not in this build&rsquo;s pool " +
+                      "(they may have left the league). Try again after the next refresh.", false);
+    }
+    resetFetchUI();
+    var bank = 0;
+    if (data.entry_history && typeof data.entry_history.bank === "number") {
+      bank = data.entry_history.bank / 10;
+    }
+    state = { squad: ids, bank: bank, ft: ft || 1, teamId: id || null, source: how,
+              chips: chips || null };
+    captains = {}; vices = {};
+    save();
+    say(msg, "Loaded 15 players for team <b>" + esc(id) + "</b> &mdash; &pound;" + bank.toFixed(1) +
+             " in the bank, " + (ft || 1) + " free transfer" + ((ft || 1) === 1 ? "" : "s") +
+             ". Building your plan&hellip;", true);
+    setTimeout(function () {
+      var b = $("#tidFetch");
+      if (b) { b.disabled = false; b.textContent = "Load my team"; }
+      document.body.classList.remove("busy");
+      $("#byId").hidden = true;
+      $("#tidPaste").value = "";
+      msg.className = "msg";
+      boot();
+    }, 900);
   }
 
   function loadPasted(input, msg) {
     var id = (input.value || "").replace(/[^0-9]/g, "");
     var raw = ($("#tidPaste").value || "").trim();
     if (!raw) return say(msg, "Nothing pasted yet. Open your team data, select it all, and paste it in.", false);
-
     var data;
     try {
       data = JSON.parse(raw);
     } catch (e) {
-      // tolerate a page copied with surrounding text
-      var a = raw.indexOf("{"), b = raw.lastIndexOf("}");
-      if (a < 0 || b <= a) return say(msg, "That does not look like team data. Paste everything from the tab that opened.", false);
-      try { data = JSON.parse(raw.slice(a, b + 1)); }
+      var a2 = raw.indexOf("{"), b2 = raw.lastIndexOf("}");
+      if (a2 < 0 || b2 <= a2) return say(msg, "That does not look like team data. Paste everything from the tab that opened.", false);
+      try { data = JSON.parse(raw.slice(a2, b2 + 1)); }
       catch (e2) { return say(msg, "That did not parse. Make sure you copied the whole thing.", false); }
     }
-
     if (data && data.picks === undefined && data.summary_overall_points !== undefined) {
-      return say(msg, "That is your team's summary, not its squad. Use the <b>Open my team data</b> " +
-                      "button, which points at the picks for GW" + (DATA.current_gw || 1) + ".", false);
+      return say(msg, "That is your team&rsquo;s summary, not its squad. Use the <b>Open my team data</b> " +
+                      "link, which points at the picks for GW" + (DATA.current_gw || 1) + ".", false);
     }
-    if (!data || !Array.isArray(data.picks) || !data.picks.length) {
-      return say(msg, "No squad found in that. It should start with <code>{\"active_chip\"</code> " +
-                      "and contain a <code>picks</code> list.", false);
-    }
-
-    var ids = data.picks.map(function (x) { return x.element; });
-    var missing = ids.filter(function (i) { return !P[i]; });
-    if (ids.length !== 15) {
-      return say(msg, "Found " + ids.length + " players, expected 15. Paste the whole thing.", false);
-    }
-    if (missing.length) {
-      return say(msg, missing.length + " of those players are not in this build&rsquo;s pool " +
-                      "(they may have left the league). Try again after the next refresh, or build the squad by hand.", false);
-    }
-
-    var bank = 0;
-    if (data.entry_history && typeof data.entry_history.bank === "number") {
-      bank = data.entry_history.bank / 10;
-    }
-    // free transfers are not in this payload; assume one and let the user adjust by re-planning
-    state = { squad: ids, bank: bank, ft: 1, teamId: id || null, source: "pasted" };
-    captains = {}; vices = {};
-    save();
-    say(msg, "Loaded 15 players" + (id ? " for team " + id : "") + ", &pound;" + bank.toFixed(1) +
-             " in the bank. Building your plan&hellip;", true);
-    setTimeout(function () {
-      $("#byId").hidden = true;
-      $("#tidPaste").value = "";
-      msg.className = "msg";
-      boot();
-    }, 700);
+    applyTeam(data, id, msg, 1, null, "pasted");
   }
 
   function openBuilder() {
@@ -836,6 +912,10 @@
     if (badge) {
       if (state.source === "published") {
         badge.innerHTML = "Showing FPL team <b>" + esc(state.teamId) + "</b>, synced server-side.";
+      } else if (state.source === "fetched") {
+        badge.innerHTML = "Showing FPL team <b>" + esc(state.teamId || "?") +
+          "</b>, fetched by number. Saved in this browser &mdash; press <b>Load by ID</b> again " +
+          "after you make a transfer.";
       } else if (state.source === "pasted") {
         badge.innerHTML = "Showing FPL team <b>" + esc(state.teamId || "?") +
           "</b>, loaded from data you pasted. Saved in this browser &mdash; paste again after you " +

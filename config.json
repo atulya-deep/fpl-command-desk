@@ -2,7 +2,7 @@
   "manager": "Gusta",
   "dashboard_title": "ADPREDFPL",
   "team_id": 7561127,
-  "bank": 0.0,
+  "bank": 2.0,
   "free_transfers": 4,
   "chips": {
     "wildcard1_used": false,
@@ -14,17 +14,17 @@
     109,
     8,
     87,
-    418,
+    31,
     368,
-    557,
-    426,
-    398,
+    15,
+    154,
+    94,
     411,
     346,
     165,
     496,
-    94,
-    329,
-    259
+    398,
+    259,
+    418
   ]
 }

@@ -721,23 +721,42 @@ def render(ctx, path):
     A("</div>")
     A('<div class="idform" id="byId" hidden>')
     A("<h3>Load a team by its FPL number</h3>")
-    A('<ol class="steps">'
-      "<li>Put your team number in the box. It is the number in the address when you view your own "
-      "team on the FPL site: <code>/entry/<b>7561127</b>/event/3</code>.</li>"
-      "<li>Press <b>Open my team data</b>. A tab opens showing your squad as raw data.</li>"
-      "<li>Select all of it (<b>Ctrl+A</b>, then <b>Ctrl+C</b>) and paste it below.</li>"
-      "</ol>")
+    A('<p style="margin:0;font-size:13.5px;color:var(--ink-2);max-width:66ch">Your number is in the '
+      "address when you view your own team on the FPL site: "
+      "<code>/entry/<b>7561127</b>/event/4</code>.</p>")
     A('<div class="idrow">'
       '<label for="tidInput" class="eyebrow">Team number</label>'
       '<input type="number" id="tidInput" inputmode="numeric" placeholder="7561127" '
       'aria-label="FPL team number">'
+      '<button class="tg" id="tidFetch" type="button" '
+      'style="background:var(--ink);color:var(--bg);border-color:var(--ink)">Load my team</button>'
+      "</div>")
+    A('<div class="msg" id="tidMsg" role="status" aria-live="polite"></div>')
+    A('<p style="margin:0;font-size:12px;color:var(--ink-3);max-width:66ch">The FPL API refuses '
+      "requests from other websites, so this goes through a public read-only relay "
+      "(<code>r.jina.ai</code>). Only your team number travels, and it is already public on every "
+      "league table you appear in. If the relay is busy, paste the data yourself instead.</p>")
+
+    A('<div class="idrow"><button class="tg" id="tidManualToggle" type="button">'
+      "Paste it manually instead</button></div>")
+
+    A('<div id="tidManual" hidden>')
+    A('<ol class="steps">'
+      "<li>Press <b>Open my team data</b>. A tab opens showing your squad as raw data.</li>"
+      "<li>Select all of it and copy &mdash; <b>Ctrl+A</b> then <b>Ctrl+C</b> on a computer, "
+      "or long-press and choose <b>Select all</b> on a phone.</li>"
+      "<li>Paste it into the box and press <b>Load pasted data</b>.</li>"
+      "</ol>")
+    A('<div class="idrow">'
       '<a class="openlink" id="tidLink" href="#" target="_blank" rel="noopener" '
       'aria-disabled="true">Open my team data &#8599;</a></div>')
     A('<textarea id="tidPaste" spellcheck="false" '
       'placeholder="Paste the whole page here" aria-label="Paste your team data"></textarea>')
-    A('<div class="idrow"><button class="tg" id="tidLoad" type="button">Load squad</button>'
-      '<button class="tg" id="tidBack" type="button">Back</button></div>')
-    A('<div class="msg" id="tidMsg" role="status"></div>')
+    A('<div class="idrow"><button class="tg" id="tidLoad" type="button">Load pasted data</button>'
+      "</div>")
+    A("</div>")
+
+    A('<div class="idrow"><button class="tg" id="tidBack" type="button">Back</button></div>')
     A("</div>")
 
     A('<p class="note">A note on live syncing: the FPL API sends no cross-origin header, so this '
